@@ -1,0 +1,19 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+cache_path = "cache"
+solc_version = "0.8.28"
+evm_version = "shanghai"
+optimizer = true
+optimizer_runs = 10_000
+
+[fmt]
+line_length = 110
+tab_width = 4
+bracket_spacing = true
+
+[rpc_endpoints]
+bsc_testnet = "${BSC_TESTNET_RPC_URL}"
+
