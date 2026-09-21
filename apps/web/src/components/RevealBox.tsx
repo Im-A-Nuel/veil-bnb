@@ -25,19 +25,19 @@ export function RevealKeyGen({ onChange }: { onChange?: (publicKey: string) => v
   }
   return (
     <div style={box}>
-      <div style={heading}>🔑 Reveal key (so the hunter can send you the exploit privately)</div>
+      <div style={heading}>Reveal key · receive the exploit privately</div>
       <button style={btn} onClick={gen}>{kp ? 'Regenerate' : 'Generate key'}</button>
       {kp && (
         <div className="mt-3 flex flex-col gap-3">
           <div>
             <span style={label}>Public key <span style={{ color: '#5A5A5A' }}>· auto-attached to the bounty</span></span>
             <textarea readOnly rows={2} value={kp.publicKey} style={field} onFocus={e => e.target.select()} />
-            <span onClick={() => copy(kp.publicKey)} style={{ ...hint, color: '#14B88A', cursor: 'pointer' }}>copy public key</span>
+            <button type="button" onClick={() => copy(kp.publicKey)} style={{ ...hint, color: '#14B88A', cursor: 'pointer', background: 'transparent', border: 0, padding: 0 }}>copy public key</button>
           </div>
           <div>
             <span style={label}>Private key <span style={{ color: '#E06A6A' }}>· SAVE SECRETLY — needed to read exploits & confirm reveals</span></span>
             <textarea readOnly rows={2} value={kp.secretKey} style={field} onFocus={e => e.target.select()} />
-            <span onClick={() => copy(kp.secretKey)} style={{ ...hint, color: '#14B88A', cursor: 'pointer' }}>copy private key</span>
+            <button type="button" onClick={() => copy(kp.secretKey)} style={{ ...hint, color: '#14B88A', cursor: 'pointer', background: 'transparent', border: 0, padding: 0 }}>copy private key</button>
           </div>
         </div>
       )}
@@ -63,7 +63,7 @@ export function RevealEncrypt({ creatorPubkey }: { creatorPubkey?: string }) {
   }
   return (
     <div style={box}>
-      <div style={heading}>🔒 Reveal your exploit to the creator (encrypted)</div>
+      <div style={heading}>Encrypted exploit reveal</div>
       <span style={label}>Reveal payload <span style={{ color: '#5A5A5A' }}>· paste / load reveal.json (a, b, salt)</span></span>
       <textarea rows={3} value={msg} onChange={e => setMsg(e.target.value)} placeholder='{"a":"1000","b":"1000","salt":"…"}' style={field} />
       <label style={{ ...hint, color: '#14B88A', cursor: 'pointer', display: 'inline-block' }}>
@@ -72,13 +72,13 @@ export function RevealEncrypt({ creatorPubkey }: { creatorPubkey?: string }) {
       </label>
       <span style={{ ...label, marginTop: 10 }}>Creator&apos;s public key {creatorPubkey && <span style={{ color: '#14B88A' }}>· auto-filled from bounty</span>}</span>
       <textarea rows={2} value={pub} onChange={e => setPub(e.target.value)} placeholder="creator public key" style={field} />
-      <button style={{ ...btn, marginTop: 10 }} onClick={run}>Encrypt →</button>
+      <button style={{ ...btn, marginTop: 10 }} onClick={run}>Encrypt reveal</button>
       {err && <div style={{ ...hint, color: '#E06A6A' }}>✗ {err}</div>}
       {out && (
         <div className="mt-3">
           <span style={label}>Ciphertext <span style={{ color: '#5A5A5A' }}>· only the creator can read this</span></span>
           <textarea readOnly rows={3} value={out} style={field} onFocus={e => e.target.select()} />
-          <span onClick={() => copy(out)} style={{ ...hint, color: '#14B88A', cursor: 'pointer' }}>copy ciphertext → send to creator</span>
+          <button type="button" onClick={() => copy(out)} style={{ ...hint, color: '#14B88A', cursor: 'pointer', background: 'transparent', border: 0, padding: 0 }}>Copy ciphertext for the creator</button>
         </div>
       )}
     </div>
@@ -120,12 +120,12 @@ export function RevealDecrypt({
 
   return (
     <div style={box}>
-      <div style={heading}>🔓 Read & verify revealed exploit</div>
+      <div style={heading}>Read and verify the revealed exploit</div>
       <span style={label}>Ciphertext (from hunter)</span>
       <textarea rows={3} value={ct} onChange={e => setCt(e.target.value)} placeholder="paste ciphertext" style={field} />
       <span style={{ ...label, marginTop: 10 }}>Your private key</span>
       <textarea rows={2} value={sec} onChange={e => setSec(e.target.value)} placeholder="paste your private key" style={field} />
-      <button style={{ ...btn, marginTop: 10 }} onClick={run}>Decrypt & verify →</button>
+      <button style={{ ...btn, marginTop: 10 }} onClick={run}>Decrypt and verify</button>
       {err && <div style={{ ...hint, color: '#E06A6A' }}>✗ {err}</div>}
 
       {reveal && (
@@ -134,16 +134,16 @@ export function RevealDecrypt({
           <textarea readOnly rows={3} value={`a = ${reveal.a}\nb = ${reveal.b}\nsalt = ${reveal.salt}`} style={{ ...field, color: '#4ADE9E' }} />
           {ok ? (
             <div style={{ ...hint, color: '#4ADE9E', fontSize: 12 }}>
-              ✅ Verified — fingerprint matches the proof. This is the REAL exploit that won the bounty.
+              Verified · fingerprint matches the winning proof.
             </div>
           ) : (
             <div style={{ ...hint, color: '#E06A6A', fontSize: 12 }}>
-              ❌ Mismatch — this reveal does NOT match the proof&apos;s fingerprint. Fake / wrong reveal.
+              Mismatch · this reveal does not match the proof fingerprint.
             </div>
           )}
           {ok && onConfirm && (
             <button style={{ ...btn, marginTop: 10 }} disabled={confirming} onClick={confirm}>
-              {confirming ? 'Confirming…' : 'Confirm & release stake →'}
+              {confirming ? 'Confirming…' : 'Confirm and release stake'}
             </button>
           )}
         </div>

@@ -16,8 +16,9 @@ import IntroOverlay from './IntroOverlay'
 import WalletModal from './WalletModal'
 import { useWallet } from '@/hooks/useWallet'
 import { shortAddr } from '@/lib/wallet'
-import { CONTRACTS_CONFIGURED, claim, listBounties, createBounty, fundBounty, confirmReveal, forfeitStake, proveReveal, hexToBytes } from '@/lib/stellar'
+import { CONTRACTS_CONFIGURED, claim, listBounties, createBounty, confirmReveal, forfeitStake, proveReveal, asHex } from '@/lib/chain'
 import type { Reveal } from '@/lib/reveal'
+import type { Hex } from 'viem'
 
 export default function VeilApp() {
   const [s, setS] = useState<AppState>(INITIAL_STATE)
@@ -26,17 +27,28 @@ export default function VeilApp() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-  const proofRef = useRef<{ journal: Uint8Array; seal: Uint8Array } | null>(null)
+  const proofRef = useRef<{ journal: Hex; seal: Hex } | null>(null)
   const wallet = useWallet()
   const connected = wallet.status === 'connected'
   const [chainBounties, setChainBounties] = useState<Bounty[] | null>(null)
+  const [chainLoading, setChainLoading] = useState(CONTRACTS_CONFIGURED)
+  const [chainError, setChainError] = useState<string | null>(null)
   const [claimTx, setClaimTx] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   // Direct-fetch daftar bounty dari registry (kalau kontrak dikonfigurasi).
   const loadBounties = useCallback(async () => {
     if (!CONTRACTS_CONFIGURED) return
-    try { setChainBounties(await listBounties()) } catch { /* biarkan null → fallback mock */ }
+    setChainLoading(true)
+    setChainError(null)
+    try {
+      setChainBounties(await listBounties())
+    } catch (error) {
+      setChainBounties([])
+      setChainError(error instanceof Error ? error.message : 'Check the RPC URL and registry address, then retry.')
+    } finally {
+      setChainLoading(false)
+    }
   }, [])
   useEffect(() => { loadBounties() }, [loadBounties])
 
@@ -115,7 +127,7 @@ export default function VeilApp() {
     try {
       const txt = await file.text()
       const j = JSON.parse(txt)
-      proofRef.current = { journal: hexToBytes(j.journal), seal: hexToBytes(j.seal) }
+      proofRef.current = { journal: asHex(j.journal), seal: asHex(j.seal) }
     } catch {
       proofRef.current = null
     }
@@ -125,7 +137,7 @@ export default function VeilApp() {
   const startVerify = async () => {
     if (!s.fileLoaded) return
     if (!proofRef.current) { showToast('Upload a valid proof.json first', 4000); return }
-    // belum connect → langsung munculin popup Freighter, lalu lanjut.
+    // If needed, request the first available injected EVM wallet.
     let addr = wallet.address
     if (!addr) {
       try { addr = (await wallet.connect()).address; showToast('Wallet connected · ' + shortAddr(addr)) }
@@ -139,7 +151,7 @@ export default function VeilApp() {
     try {
       // bounty_id = id asli on-chain; kirim journal + seal dari proof.json.
       const { journal, seal } = proofRef.current!
-      const hash = await claim(Number(activeId), addr, journal, seal, wallet.sign)
+      const hash = await claim(Number(activeId), addr, journal, seal)
       setClaimTx(hash)
       setS(st => ({ ...st, verifyStep: STEPS.length, verified: true, claimed: { ...st.claimed, [activeId]: true } }))
       wallet.refreshBalance()
@@ -165,7 +177,7 @@ export default function VeilApp() {
     if (!f.creatorPubkey) {
       showToast('Generate a reveal key first (so hunters can send you the exploit)', 4500); return
     }
-    // belum connect → langsung munculin popup Freighter, lalu lanjut.
+    // If needed, request the first available injected EVM wallet.
     let addr = wallet.address
     if (!addr) {
       try { addr = (await wallet.connect()).address; showToast('Wallet connected · ' + shortAddr(addr)) }
@@ -173,20 +185,25 @@ export default function VeilApp() {
     }
     setBusy(true)
     try {
-      showToast('Opening bounty… approve 2 signatures in Freighter', 8000)
-      const stakeXlm = Number(f.stake) || 0
+      showToast(f.token === 'USDT' ? 'Approve USDT, then confirm the bounty transaction' : 'Confirm the bounty transaction in your wallet', 8000)
       const revealWindow = Number(f.revealWindow) || 0
       const escapeWindow = Number(f.escapeWindow) || 0
-      const id = await createBounty(
-        addr, f.addr, f.imageId, f.creatorPubkey,
-        f.title || 'ZK Bounty', f.description,
-        stakeXlm, revealWindow, escapeWindow, wallet.sign,
-      )
-      const amount = BigInt(Math.round(Number(f.reward) * 1e7))
-      await fundBounty(id, addr, amount, wallet.sign)
+      const { bountyId } = await createBounty({
+        account: addr,
+        victim: f.addr,
+        imageId: f.imageId,
+        creatorPubkey: f.creatorPubkey,
+        title: f.title || 'ZK Bounty',
+        description: f.description,
+        reward: f.reward,
+        stake: f.stake,
+        token: f.token,
+        revealWindow,
+        escapeWindow,
+      })
       await loadBounties()
       wallet.refreshBalance()
-      showToast(`Bounty #${id} opened — ${f.reward} XLM locked`, 4200)
+      showToast(`Bounty #${bountyId} opened · ${f.reward} ${f.token} locked`, 4200)
       go('hunt')
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Open bounty failed', 5000)
@@ -202,7 +219,7 @@ export default function VeilApp() {
       try { addr = (await wallet.connect()).address } catch { showToast('Connect wallet first'); return }
     }
     try {
-      await confirmReveal(Number(bountyId), addr, wallet.sign)
+      await confirmReveal(Number(bountyId), addr)
       await loadBounties()
       showToast('Reveal confirmed — stake released to hunter', 4200)
     } catch (e) {
@@ -217,7 +234,7 @@ export default function VeilApp() {
       try { addr = (await wallet.connect()).address } catch { showToast('Connect wallet first'); return }
     }
     try {
-      await forfeitStake(Number(bountyId), addr, wallet.sign)
+      await forfeitStake(Number(bountyId), addr)
       await loadBounties()
       showToast('Deadline passed — stake forfeited to creator', 4200)
     } catch (e) {
@@ -232,7 +249,7 @@ export default function VeilApp() {
       try { addr = (await wallet.connect()).address } catch { showToast('Connect wallet first'); return }
     }
     try {
-      await proveReveal(Number(bountyId), addr, reveal.a, reveal.b, reveal.salt, wallet.sign)
+      await proveReveal(Number(bountyId), addr, reveal)
       await loadBounties()
       showToast('Revealed on-chain — stake reclaimed', 4200)
     } catch (e) {
@@ -240,8 +257,8 @@ export default function VeilApp() {
     }
   }
 
-  // Derived — pakai bounty on-chain kalau ada, kalau tidak fallback ke mock.
-  const baseBounties = (CONTRACTS_CONFIGURED && chainBounties) ? chainBounties : BOUNTIES
+  // Demo data is used only until a registry address is configured.
+  const baseBounties = CONTRACTS_CONFIGURED ? (chainBounties ?? []) : BOUNTIES
   const allBounties = baseBounties.map(b => ({
     ...b,
     isOpen:    b.status === 'open' && !s.claimed[b.id],
@@ -257,7 +274,6 @@ export default function VeilApp() {
   }
 
   const openCount  = allBounties.filter(b => b.isOpen).length
-  const totalPool  = allBounties.filter(b => b.isOpen).reduce((a, b) => a + b.rewardNum, 0).toLocaleString('en-US')
   const activeBounty = allBounties.find(b => b.id === s.activeId) ?? allBounties[0]
 
   const steps = STEPS.map((label, i) => {
@@ -307,13 +323,15 @@ export default function VeilApp() {
             <Hunt
               bounties={filtered}
               openCount={openCount}
-              totalPool={totalPool}
               filter={s.filter}
               search={s.search}
               onFilter={(f: Filter) => setS(prev => ({ ...prev, filter: f }))}
               onSearch={(q: string) => setS(prev => ({ ...prev, search: q }))}
               onSubmit={openSubmit}
               onDetail={openDetail}
+              loading={chainLoading}
+              error={chainError}
+              onRetry={loadBounties}
             />
           )}
 

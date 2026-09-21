@@ -54,7 +54,7 @@ export function decryptAsCreator(packedB64: string, secretB64: string): string {
 // ============================================================================
 // LEVEL 1.5 — verifikasi sidik jari (commit-reveal binding)
 //
-// Guest meng-commit sha256(a_le16 || b_le16 || salt) ke journal. Creator dapat
+// Guest meng-commit sha256(abi.encode(uint256(a), uint256(b), bytes32(salt))) ke journal. Creator dapat
 // reveal {a,b,salt} → hitung ulang sha256 → cocokkan dgn sidik jari di journal.
 // Cocok = reveal ASLI yg memenangkan bounty; beda = reveal palsu.
 // ============================================================================
@@ -67,16 +67,16 @@ const hexToBytes = (h: string) => {
   for (let i = 0; i < out.length; i++) out[i] = parseInt(s.slice(i * 2, i * 2 + 2), 16)
   return out
 }
-/** u128 → 16 byte little-endian (samakan dgn a.to_le_bytes() di guest). */
-function u128ToLE16(n: bigint): Uint8Array {
-  const out = new Uint8Array(16)
+/** uint256 → 32-byte big-endian word, matching Solidity ABI encoding. */
+function u256ToBE32(n: bigint): Uint8Array {
+  if (n < BigInt(0)) throw new Error('nilai reveal tidak boleh negatif')
+  const out = new Uint8Array(32)
   let v = n
-  const mask = BigInt(255)
-  const eight = BigInt(8)
-  for (let i = 0; i < 16; i++) {
-    out[i] = Number(v & mask)
-    v >>= eight
+  for (let i = 31; i >= 0; i--) {
+    out[i] = Number(v & BigInt(255))
+    v >>= BigInt(8)
   }
+  if (v !== BigInt(0)) throw new Error('nilai reveal melebihi uint256')
   return out
 }
 
@@ -93,30 +93,16 @@ export function parseReveal(text: string): Reveal {
   return { a: String(o.a), b: String(o.b), salt: String(o.salt) }
 }
 
-/** Hitung sidik jari sha256(a_le16 || b_le16 || salt) → hex. (= guest) */
+/** Hitung sidik jari SHA-256 atas ABI preimage 96 byte. */
 export async function fingerprintFromReveal(r: Reveal): Promise<string> {
-  const data = new Uint8Array(64)
-  data.set(u128ToLE16(BigInt(r.a)), 0)
-  data.set(u128ToLE16(BigInt(r.b)), 16)
+  const data = new Uint8Array(96)
+  data.set(u256ToBE32(BigInt(r.a)), 0)
+  data.set(u256ToBE32(BigInt(r.b)), 32)
   const salt = hexToBytes(r.salt)
   if (salt.length !== 32) throw new Error('salt harus 32 byte')
-  data.set(salt, 32)
+  data.set(salt, 64)
   const digest = await crypto.subtle.digest('SHA-256', data)
   return toHex(new Uint8Array(digest))
-}
-
-/**
- * Ekstrak sidik jari dari journal RISC Zero.
- * Journal = commit(victim_id [u8;32]) lalu commit(fingerprint [u8;32]).
- * risc0 serialize tiap u8 jadi 1 word LE (4 byte) → 64 logical byte = 256 byte.
- * logical[i] = packed[i*4]; fingerprint = logical[32..64].
- */
-export function fingerprintFromJournal(journalHex: string): string {
-  const packed = hexToBytes(journalHex)
-  if (packed.length < 256) throw new Error('journal terlalu pendek (bukan format Level 1.5)')
-  const fp = new Uint8Array(32)
-  for (let i = 0; i < 32; i++) fp[i] = packed[(32 + i) * 4]
-  return toHex(fp)
 }
 
 /**

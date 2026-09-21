@@ -9,16 +9,18 @@ const SANS  = "var(--font-sans,'Inter',sans-serif)"
 interface Props {
   bounties: (Bounty & { isOpen: boolean; isClaimed: boolean })[]
   openCount: number
-  totalPool: string
   filter: Filter
   search: string
   onFilter: (f: Filter) => void
   onSearch: (q: string) => void
   onSubmit: (id: string) => void
   onDetail: (id: string) => void
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
-export default function Hunt({ bounties, openCount, totalPool, filter, search, onFilter, onSearch, onSubmit, onDetail }: Props) {
+export default function Hunt({ bounties, openCount, filter, search, onFilter, onSearch, onSubmit, onDetail, loading, error, onRetry }: Props) {
   const filterBg  = (f: Filter) => filter === f ? 'rgba(20,184,138,.1)' : 'transparent'
   const filterClr = (f: Filter) => filter === f ? '#14B88A' : '#8A8A8A'
 
@@ -37,7 +39,7 @@ export default function Hunt({ bounties, openCount, totalPool, filter, search, o
           </p>
         </div>
         <div className="text-right" style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A', letterSpacing: '.12em', textTransform: 'uppercase' }}>
-          {openCount} open · {totalPool} XLM pooled
+          {openCount} open · BSC Testnet
         </div>
       </div>
 
@@ -45,12 +47,12 @@ export default function Hunt({ bounties, openCount, totalPool, filter, search, o
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div className="flex gap-2">
           {(['all', 'open', 'claimed'] as Filter[]).map(f => (
-            <span key={f} onClick={() => onFilter(f)}
+            <button type="button" key={f} onClick={() => onFilter(f)}
               className="vlink text-[11px] md:text-[12px] px-3 md:px-4 py-2"
               style={{ fontFamily: MONO, letterSpacing: '.02em', border: '1px solid #242424', borderRadius: 2, cursor: 'pointer', background: filterBg(f), color: filterClr(f), textTransform: 'capitalize' }}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
-            </span>
+            </button>
           ))}
         </div>
         <div className="vinput flex items-center gap-2 w-full sm:w-[280px] md:w-[300px]"
@@ -68,7 +70,24 @@ export default function Hunt({ bounties, openCount, totalPool, filter, search, o
       </div>
 
       {/* cards: desktop 3-col, mobile 1-col */}
-      {bounties.length === 0 ? (
+      {loading ? (
+        <div className="flex flex-col items-center justify-center text-center" role="status"
+          style={{ border: '1px dashed #242424', borderRadius: 4, padding: '64px 20px' }}
+        >
+          <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 16, color: '#EDEDED', marginBottom: 6 }}>Reading BSC Testnet</div>
+          <p style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A', margin: 0 }}>Loading bounties from the registry contract.</p>
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center text-center" role="alert"
+          style={{ border: '1px solid #4a2929', borderRadius: 4, padding: '64px 20px' }}
+        >
+          <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 16, color: '#EDEDED', marginBottom: 6 }}>Registry unavailable</div>
+          <p style={{ fontFamily: MONO, fontSize: 12, color: '#A8A8A8', margin: '0 0 18px' }}>{error}</p>
+          <button type="button" className="vbtn vbtn-ghost" onClick={onRetry}
+            style={{ background: 'transparent', color: '#EDEDED', border: '1px solid #444', padding: '10px 18px', fontFamily: SANS, borderRadius: 2, cursor: 'pointer' }}
+          >Retry</button>
+        </div>
+      ) : bounties.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center"
           style={{ border: '1px dashed #242424', borderRadius: 4, padding: '64px 20px' }}
         >
@@ -87,7 +106,7 @@ export default function Hunt({ bounties, openCount, totalPool, filter, search, o
             <div className="flex items-start justify-between mb-4 md:mb-5">
               {b.isOpen
                 ? <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', padding: '4px 9px', borderRadius: 2, background: 'rgba(20,184,138,.08)', border: '1px solid rgba(20,184,138,.35)', color: '#14B88A' }}>OPEN</span>
-                : <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', padding: '4px 9px', borderRadius: 2, background: 'transparent', border: '1px solid #242424', color: '#5A8A75' }}>CLAIMED</span>
+                : <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.12em', padding: '4px 9px', borderRadius: 2, background: 'transparent', border: '1px solid #242424', color: '#7FA88F' }}>{b.status === 'refunded' ? 'REFUNDED' : 'CLAIMED'}</span>
               }
               <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 20, color: '#EDEDED' }}>{b.reward}</span>
             </div>
@@ -97,8 +116,8 @@ export default function Hunt({ bounties, openCount, totalPool, filter, search, o
               victim: {b.victim}
             </div>
             {b.isOpen
-              ? <button onClick={() => onSubmit(b.id)} className="vbtn vbtn-ghost" style={{ width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid #333', padding: '10px', fontFamily: SANS, fontWeight: 500, fontSize: 13, borderRadius: 2, cursor: 'pointer' }}>Submit proof →</button>
-              : <button onClick={() => onDetail(b.id)} className="vbtn vbtn-ghost" style={{ width: '100%', background: 'transparent', color: '#5A8A75', border: '1px solid #242424', padding: '10px', fontFamily: SANS, fontWeight: 500, fontSize: 13, borderRadius: 2, cursor: 'pointer' }}>View details →</button>
+              ? <button onClick={() => onSubmit(b.id)} className="vbtn vbtn-ghost" style={{ width: '100%', background: 'transparent', color: '#EDEDED', border: '1px solid #333', padding: '10px', fontFamily: SANS, fontWeight: 500, fontSize: 13, borderRadius: 2, cursor: 'pointer' }}>Submit proof</button>
+              : <button onClick={() => onDetail(b.id)} className="vbtn vbtn-ghost" style={{ width: '100%', background: 'transparent', color: '#7FA88F', border: '1px solid #242424', padding: '10px', fontFamily: SANS, fontWeight: 500, fontSize: 13, borderRadius: 2, cursor: 'pointer' }}>View details</button>
             }
           </div>
         ))}

@@ -28,28 +28,28 @@ export default function AppNav({ go, huntActive, createActive, balanceStr, conne
       style={{ borderBottom: '1px solid #242424', position: 'sticky', top: 0, background: '#0A0A0A', zIndex: 20 }}
     >
       <div className="flex items-center gap-5 md:gap-10">
-        <div onClick={() => go('landing')} className="vbtn"
-          style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '.34em', cursor: 'pointer', color: '#EDEDED' }}
+        <button type="button" onClick={() => go('landing')} className="vbtn"
+          style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '.34em', cursor: 'pointer', color: '#EDEDED', background: 'transparent', border: 0, padding: 0 }}
         >
           VEIL
-        </div>
+        </button>
         <div className="flex gap-[3px] md:gap-[6px]"
           style={{ border: '1px solid #242424', borderRadius: 2, padding: 3 }}
         >
-          <span onClick={() => go('hunt')}
+          <button type="button" onClick={() => go('hunt')} aria-current={huntActive ? 'page' : undefined}
             className="vlink text-[11px] md:text-[12px] px-3 md:px-[14px] py-[6px] md:py-[7px]"
-            style={{ fontFamily: MONO, letterSpacing: '.02em', borderRadius: 1, cursor: 'pointer', background: tabBg(huntActive), color: tabClr(huntActive) }}
+            style={{ fontFamily: MONO, letterSpacing: '.02em', borderRadius: 1, cursor: 'pointer', background: tabBg(huntActive), color: tabClr(huntActive), border: 0 }}
           >
             <span className="hidden sm:inline">Hunt bounties</span>
             <span className="inline sm:hidden">Hunt</span>
-          </span>
-          <span onClick={() => go('create')}
+          </button>
+          <button type="button" onClick={() => go('create')} aria-current={createActive ? 'page' : undefined}
             className="vlink text-[11px] md:text-[12px] px-3 md:px-[14px] py-[6px] md:py-[7px]"
-            style={{ fontFamily: MONO, letterSpacing: '.02em', borderRadius: 1, cursor: 'pointer', background: tabBg(createActive), color: tabClr(createActive) }}
+            style={{ fontFamily: MONO, letterSpacing: '.02em', borderRadius: 1, cursor: 'pointer', background: tabBg(createActive), color: tabClr(createActive), border: 0 }}
           >
             <span className="hidden sm:inline">Create bounty</span>
             <span className="inline sm:hidden">Create</span>
-          </span>
+          </button>
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export default function AppNav({ go, huntActive, createActive, balanceStr, conne
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: MONO, fontSize: 12, color: '#EDEDED', letterSpacing: '.02em', padding: 0 }}
           >{address ? shortAddr(address) : '—'}</button>
           <span className="hidden sm:inline" style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A5A' }}>·</span>
-          <span style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A' }}>{balanceStr} XLM</span>
+          <span style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A' }}>{balanceStr} BNB</span>
           <span style={{ width: 1, height: 14, background: '#242424', display: 'inline-block', margin: '0 2px' }} />
           <button onClick={onDisconnect} title="Disconnect wallet" aria-label="Disconnect wallet"
             className="vlink flex items-center"

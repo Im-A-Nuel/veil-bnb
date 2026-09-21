@@ -23,8 +23,8 @@ export default function Detail({ bounty, backToBounties, walletAddr, onConfirmRe
   const [revealText, setRevealText] = useState('')
   const [reclaimErr, setReclaimErr] = useState<string | null>(null)
   const claimed = bounty.status === 'claimed'
-  const isCreator = !!walletAddr && !!bounty.creator && walletAddr === bounty.creator
-  const isClaimer = !!walletAddr && !!bounty.claimer && walletAddr === bounty.claimer
+  const isCreator = !!walletAddr && !!bounty.creator && walletAddr.toLowerCase() === bounty.creator.toLowerCase()
+  const isClaimer = !!walletAddr && !!bounty.claimer && walletAddr.toLowerCase() === bounty.claimer.toLowerCase()
   const settled = !!bounty.revealed || !!bounty.forfeited
   const hasStake = (bounty.stakeNum ?? 0) > 0
   const nowSec = Math.floor(Date.now() / 1000)
@@ -55,15 +55,17 @@ export default function Detail({ bounty, backToBounties, walletAddr, onConfirmRe
     else { revealStatus = 'AWAITING REVEAL'; revealColor = '#14B88A' }
   }
 
+  const statusLabel = bounty.status.toUpperCase()
+  const statusColor = bounty.status === 'open' ? '#14B88A' : bounty.status === 'claimed' ? '#5A8A75' : '#E0A26A'
   const rows: [string, string, string][] = [
-    ['Status', claimed ? 'CLAIMED' : 'OPEN', claimed ? '#5A8A75' : '#14B88A'],
+    ['Status', statusLabel, statusColor],
     ['Reward', bounty.reward, '#14B88A'],
     ['Victim contract', bounty.victim, '#EDEDED'],
     ['Created by', bounty.creator ? shortAddr(bounty.creator) : '—', '#EDEDED'],
     ['Claimed by', bounty.claimer ? shortAddr(bounty.claimer) : '— (not yet claimed)', claimed ? '#EDEDED' : '#5A5A5A'],
   ]
   if (hasStake) {
-    rows.push(['Hunter stake', `${bounty.stakeNum!.toLocaleString('en-US')} XLM`, '#EDEDED'])
+    rows.push(['Hunter stake', `${bounty.stakeNum!.toLocaleString('en-US')} ${bounty.tokenSymbol ?? 'BNB'}`, '#EDEDED'])
     rows.push(['Reveal / stake', revealStatus, revealColor])
   }
 
@@ -90,7 +92,9 @@ export default function Detail({ bounty, backToBounties, walletAddr, onConfirmRe
           <p style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A', margin: '14px 0 0', lineHeight: 1.6 }}>
             {claimed
               ? 'The hunter proved the exploit in zero-knowledge — the secret input was never revealed. The contract verified the proof on-chain and released the reward automatically.'
-              : 'Bounty is still open. A hunter can submit a valid proof to claim the reward.'}
+              : bounty.status === 'refunded'
+                ? 'The bounty expired without a claim. The remaining escrow was returned to its creator.'
+                : 'Bounty is still open. A hunter can submit a valid proof to claim the reward.'}
           </p>
         </div>
       </div>
@@ -101,7 +105,7 @@ export default function Detail({ bounty, backToBounties, walletAddr, onConfirmRe
           style={{ border: '1px solid #4a3a25', background: '#15110b', borderRadius: 2 }}>
           <span style={{ fontSize: 14, marginTop: 1 }}>🔒</span>
           <span style={{ fontFamily: MONO, fontSize: 12, color: '#E0A26A', lineHeight: 1.55 }}>
-            <b style={{ color: '#EDEDED' }}>{bounty.stakeNum!.toLocaleString('en-US')} XLM still staked</b> — held by the contract, not yet returned.
+            <b style={{ color: '#EDEDED' }}>{bounty.stakeNum!.toLocaleString('en-US')} {bounty.tokenSymbol ?? 'BNB'} still staked</b> — held by the contract, not yet returned.
             The hunter reveals the exploit → the creator confirms → stake returns to the hunter.
             Miss the deadline → stake forfeited to the creator.
           </span>
@@ -115,8 +119,8 @@ export default function Detail({ bounty, backToBounties, walletAddr, onConfirmRe
           <span style={{ fontSize: 14, marginTop: 1 }}>{bounty.revealed ? '✅' : '⚠️'}</span>
           <span style={{ fontFamily: MONO, fontSize: 12, color: bounty.revealed ? '#4ADE9E' : '#E0A26A', lineHeight: 1.55 }}>
             {bounty.revealed
-              ? `Reveal confirmed — ${bounty.stakeNum!.toLocaleString('en-US')} XLM stake returned to the hunter.`
-              : `Deadline passed without reveal — ${bounty.stakeNum!.toLocaleString('en-US')} XLM stake forfeited to the creator.`}
+              ? `Reveal confirmed · ${bounty.stakeNum!.toLocaleString('en-US')} ${bounty.tokenSymbol ?? 'BNB'} stake returned to the hunter.`
+              : `Deadline passed without reveal · ${bounty.stakeNum!.toLocaleString('en-US')} ${bounty.tokenSymbol ?? 'BNB'} stake forfeited to the creator.`}
           </span>
         </div>
       )}

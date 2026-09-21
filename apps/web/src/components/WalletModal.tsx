@@ -40,6 +40,7 @@ export default function WalletModal({ open, connectingId, onClose, onChoose }: P
   return (
     <div
       onClick={onClose}
+      role="presentation"
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
         background: 'rgba(5,5,5,.74)', backdropFilter: 'blur(6px)',
@@ -48,14 +49,17 @@ export default function WalletModal({ open, connectingId, onClose, onChoose }: P
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wallet-dialog-title"
         className="screen-enter"
         style={{ width: '100%', maxWidth: 400, background: '#0E0E0E', border: '1px solid #242424', borderRadius: 8, overflow: 'hidden', boxShadow: '0 30px 80px -24px rgba(0,0,0,.85)' }}
       >
         {/* header */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1c1c1c' }}>
           <div>
-            <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 15, color: '#EDEDED' }}>Connect a wallet</div>
-            <div style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A', marginTop: 2 }}>Stellar · Testnet</div>
+            <div id="wallet-dialog-title" style={{ fontFamily: SANS, fontWeight: 600, fontSize: 15, color: '#EDEDED' }}>Connect a wallet</div>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: '#767676', marginTop: 2 }}>BNB Smart Chain · Testnet</div>
           </div>
           <button onClick={onClose} aria-label="Close" className="vbtn"
             style={{ background: 'transparent', border: '1px solid #242424', borderRadius: 4, width: 30, height: 30, color: '#8A8A8A', cursor: 'pointer', fontSize: 14 }}

@@ -10,7 +10,7 @@ const SANS = "var(--font-sans,'Inter',sans-serif)"
 
 const FEATURES = [
   { title: 'Zero-knowledge proofs',   desc: "Prove the exploit is real without revealing a single byte of how you did it." },
-  { title: 'On-chain verification',   desc: "RISC Zero receipts are verified inside the Soroban contract — no trusted middleman." },
+  { title: 'On-chain verification',   desc: "RISC Zero receipts are checked by a Solidity verifier before the BSC escrow releases funds." },
   { title: 'Automatic payout',        desc: "A valid proof releases the escrow in the same transaction. No negotiation, no delay." },
   { title: 'Open-source rules',       desc: "Each bounty's ImageID pins the exact guest program that defines a valid break." },
   { title: 'No disclosure risk',      desc: "The vulnerability is proven, not published. Nothing leaks to the contract or the chain." },

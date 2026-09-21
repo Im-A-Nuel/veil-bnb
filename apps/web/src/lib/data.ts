@@ -1,12 +1,13 @@
 export type Screen = 'landing' | 'features' | 'howitworks' | 'hunt' | 'submit' | 'verify' | 'create' | 'detail'
 export type Filter = 'all' | 'open' | 'claimed'
-export type Token = 'XLM' | 'USDC'
+export type Token = 'BNB' | 'USDT'
 
 export interface Bounty {
   id: string
-  status: 'open' | 'claimed'
+  status: 'open' | 'claimed' | 'refunded'
   reward: string
   rewardNum: number
+  tokenSymbol?: Token
   title: string
   desc: string
   victim: string
@@ -15,7 +16,7 @@ export interface Bounty {
   claimer?: string | null // alamat yang berhasil klaim (on-chain), null kalau belum
   // --- Level 1.5 + stake (on-chain) ---
   creatorPubkey?: string // X25519 pubkey base64 — hunter enkripsi reveal ke sini
-  stakeNum?: number      // stake XLM yg dikunci hunter saat claim
+  stakeNum?: number      // stake dalam token bounty yang dikunci saat claim
   revealWindow?: number  // detik utk reveal setelah claim
   escapeWindow?: number  // detik sebelum deadline saat escape hatch on-chain kebuka
   fingerprintHex?: string // sidik jari sha256(a,b,salt) dari journal pemenang
@@ -41,12 +42,8 @@ export interface AppState {
 }
 
 export const BOUNTIES: Bounty[] = [
-  { id: 'factoring', status: 'open',    reward: '500 XLM',   rewardNum: 500,  title: 'Factoring guard',  desc: 'Break the multiplication invariant without revealing the factors.',      victim: 'CA4F…9XQ2' },
-  { id: 'overflow',  status: 'open',    reward: '750 XLM',   rewardNum: 750,  title: 'Overflow check',   desc: 'Trigger an arithmetic overflow the guard fails to catch.',              victim: 'CB18…7K4D' },
-  { id: 'access',    status: 'claimed', reward: '1,200 XLM', rewardNum: 1200, title: 'Access bypass',    desc: 'Call a privileged path without the admin signature.',                   victim: 'CC93…0XR1' },
-  { id: 'rounding',  status: 'open',    reward: '300 XLM',   rewardNum: 300,  title: 'Rounding drain',   desc: 'Drain value through repeated rounding in the fee math.',                victim: 'CD52…2M8F' },
-  { id: 'reentry',   status: 'claimed', reward: '900 XLM',   rewardNum: 900,  title: 'Re-entrancy',      desc: "Re-enter settle() before balances update.",                             victim: 'CE77…1QP6' },
-  { id: 'oracle',    status: 'open',    reward: '650 XLM',   rewardNum: 650,  title: 'Oracle skew',      desc: 'Push a price the bounds check should reject.',                          victim: 'CF04…9ZB3' },
+  { id: 'factoring', status: 'open', reward: '0.5 BNB', rewardNum: 0.5, tokenSymbol: 'BNB', title: 'Demo · Factoring guard', desc: 'Local preview: prove knowledge of non-trivial factors without revealing them.', victim: '0x1111…1111' },
+  { id: 'overflow', status: 'open', reward: '250 USDT', rewardNum: 250, tokenSymbol: 'USDT', title: 'Demo · Overflow check', desc: 'Local preview: prove an arithmetic edge case while keeping the triggering input private.', victim: '0x2222…2222' },
 ]
 
 export const STEPS = [
@@ -66,7 +63,7 @@ export const INITIAL_STATE: AppState = {
   dragging: false,
   verifyStep: 0,
   verified: false,
-  balance: 2450,
+  balance: 0,
   claimed: {},
   form: {
     addr: '',
@@ -74,7 +71,7 @@ export const INITIAL_STATE: AppState = {
     title: '',
     description: '',
     reward: '',
-    token: 'XLM',
+    token: 'BNB',
     stake: '',
     revealWindow: '3600',  // detik; default 1 jam
     escapeWindow: '1800',  // detik; escape hatch kebuka 30 menit sebelum deadline

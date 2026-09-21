@@ -1,7 +1,7 @@
 'use client'
 
 import { Bounty } from '@/lib/data'
-import { explorerTxUrl } from '@/lib/stellar'
+import { explorerTxUrl } from '@/lib/chain'
 import { shortAddr } from '@/lib/wallet'
 import { RevealEncrypt } from '@/components/RevealBox'
 
@@ -105,7 +105,7 @@ export default function Verify({ bounty, steps, verified, balanceStr, backToBoun
             <div className="grid grid-cols-2" style={{ borderTop: '1px solid #242424' }}>
               <div className="px-5 md:px-8 py-4 md:py-5" style={{ borderRight: '1px solid #242424' }}>
                 <div style={{ fontFamily: MONO, fontSize: 10, color: '#5A5A5A', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>Wallet balance</div>
-                <div style={{ fontFamily: MONO, fontWeight: 600, fontSize: 18, color: '#EDEDED' }}>{balanceStr} XLM</div>
+                <div style={{ fontFamily: MONO, fontWeight: 600, fontSize: 18, color: '#EDEDED' }}>{balanceStr} BNB</div>
               </div>
               <div className="px-5 md:px-8 py-4 md:py-5">
                 <div style={{ fontFamily: MONO, fontSize: 10, color: '#5A5A5A', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>Bounty status</div>
@@ -119,7 +119,7 @@ export default function Verify({ bounty, steps, verified, balanceStr, backToBoun
               style={{ border: '1px solid #4a3a25', background: '#15110b', borderRadius: 2 }}>
               <span style={{ fontSize: 14, marginTop: 1 }}>🔒</span>
               <span style={{ fontFamily: MONO, fontSize: 12, color: '#E0A26A', lineHeight: 1.55 }}>
-                <b style={{ color: '#EDEDED' }}>{bounty.stakeNum!.toLocaleString('en-US')} XLM staked</b> — held by the contract.
+                <b style={{ color: '#EDEDED' }}>{bounty.stakeNum!.toLocaleString('en-US')} {bounty.tokenSymbol ?? 'BNB'} staked</b> — held by the contract.
                 Reveal the exploit below (encrypt → send to creator) so the creator confirms and your stake is returned.
                 Miss the deadline → stake forfeited to the creator.
               </span>

@@ -12,15 +12,16 @@ interface Props {
 
 export default function Nav({ active, go, connectWallet }: Props) {
   const link = (label: string, target: Screen) => (
-    <span
+    <button type="button"
       onClick={() => go(target)}
       style={{
         font: `13px/1 ${MONO}`, letterSpacing: '.02em', cursor: 'pointer',
         color: active === target ? '#EDEDED' : '#8A8A8A',
+        background: 'transparent', border: 0, padding: 0,
       }}
     >
       {label}
-    </span>
+    </button>
   )
 
   return (
@@ -30,17 +31,17 @@ export default function Nav({ active, go, connectWallet }: Props) {
       padding: '22px 48px', borderBottom: '1px solid #242424',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 48 }}>
-        <div
+        <button type="button"
           onClick={() => go('landing')}
-          style={{ font: `700 18px ${MONO}`, letterSpacing: '.34em', cursor: 'pointer', color: '#EDEDED' }}
+          style={{ font: `700 18px ${MONO}`, letterSpacing: '.34em', cursor: 'pointer', color: '#EDEDED', background: 'transparent', border: 0, padding: 0 }}
         >
           VEIL
-        </div>
+        </button>
         <div style={{ display: 'flex', gap: 30 }}>
           {link('Features', 'features')}
           {link('How it works', 'howitworks')}
           {link('Bounties', 'hunt')}
-          <span style={{ font: `13px ${MONO}`, color: '#8A8A8A', letterSpacing: '.02em', cursor: 'pointer' }}>Docs</span>
+          <a href="https://github.com/Im-A-Nuel/veil-bnb/tree/main/docs" target="_blank" rel="noreferrer" className="vlink" style={{ font: `13px ${MONO}`, color: '#8A8A8A', letterSpacing: '.02em' }}>Docs</a>
         </div>
       </div>
       <button

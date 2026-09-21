@@ -10,22 +10,30 @@ const SANS  = "var(--font-sans,'Inter',sans-serif)"
 
 // Template guest default (logika faktorisasi) — titik awal buat creator edit.
 const DEFAULT_GUEST = `use risc0_zkvm::guest::env;
+use risc0_zkvm::sha::{Impl, Sha256};
 
 fn main() {
-    // input RAHASIA (tidak di-commit → tetap rahasia)
     let a: u128 = env::read();
     let b: u128 = env::read();
-    // input PUBLIK
-    let target: u128 = env::read();
-    let victim_id: [u8; 32] = env::read();
+    let salt: [u8; 32] = env::read();
+    let victim: [u8; 20] = env::read();
+    let bounty_id: u64 = env::read();
 
-    // aturan "bobol" — ubah sesuai invariant kontrakmu:
+    let target: u128 = 1_000_000;
     assert!(a.checked_mul(b) == Some(target), "a*b != target");
-    assert!(a != 1 && b != 1, "faktorisasi trivial");
-    assert!(a != target && b != target, "faktorisasi trivial");
+    assert!(a != 1 && b != 1 && a != target && b != target);
 
-    // commit PUBLIK saja (tanpa a,b)
-    env::commit(&(victim_id, target));
+    let mut reveal = [0u8; 96];
+    reveal[16..32].copy_from_slice(&a.to_be_bytes());
+    reveal[48..64].copy_from_slice(&b.to_be_bytes());
+    reveal[64..96].copy_from_slice(&salt);
+    let fingerprint = Impl::hash_bytes(&reveal);
+
+    let mut journal = [0u8; 96];
+    journal[12..32].copy_from_slice(&victim);
+    journal[56..64].copy_from_slice(&bounty_id.to_be_bytes());
+    journal[64..96].copy_from_slice(fingerprint.as_bytes());
+    env::commit_slice(&journal);
 }
 `
 
@@ -63,16 +71,16 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
     setGenerating(true)
     setGenMsg('AI is drafting the guest… (a few seconds)')
     try {
-      const description = `Contract address: ${form.addr || '(not given)'}\n\n${aiDesc}`
-      const r = await fetch('/api/generate-guest', {
+      const base = process.env.NEXT_PUBLIC_AGENT_URL?.replace(/\/$/, '')
+      const r = await fetch(base ? `${base}/generate-guest` : '/api/generate-guest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description }),
+        body: JSON.stringify({ contractAddress: form.addr, sourceOrDescription: aiDesc }),
       })
       const j = await r.json()
       if (!r.ok || j.error) throw new Error(j.error || 'generate failed')
-      setSrc(j.code)
-      setGenMsg('✓ Draft ready — review/edit below, then Compile')
+      setSrc(j.guestSource)
+      setGenMsg(`Draft ready for review. ${j.riskSummary || ''}`)
     } catch (e) {
       setGenMsg('✗ ' + (e instanceof Error ? e.message : 'generate failed'))
     } finally {
@@ -84,9 +92,8 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
     setCompiling(true)
     setCompileMsg('Compiling on server… (first build can take a few minutes)')
     try {
-      // default: API route bawaan Next (/api/compile). Kalau backend dipisah
-      // (mis. di WSL), set NEXT_PUBLIC_COMPILE_URL=http://localhost:3001/compile
-      const url = process.env.NEXT_PUBLIC_COMPILE_URL || '/api/compile'
+      const base = process.env.NEXT_PUBLIC_AGENT_URL?.replace(/\/$/, '')
+      const url = base ? `${base}/compile-guest` : '/api/compile'
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +132,7 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
           <label style={{ display: 'block', fontFamily: SANS, fontWeight: 500, fontSize: 13, color: '#EDEDED', marginBottom: 8 }}>
             Victim contract address
           </label>
-          <input className={inputCls} value={form.addr} onChange={e => onAddrChange(e.target.value)} placeholder="CA4F…9XQ2" style={inputSty} />
+          <input className={inputCls} value={form.addr} onChange={e => onAddrChange(e.target.value)} placeholder="0x…" style={inputSty} />
           <div style={{ fontFamily: SANS, fontSize: 11, color: '#5A5A5A', marginTop: 7 }}>the deployed contract being tested</div>
         </div>
 
@@ -148,12 +155,12 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
         {/* mode: paste ImageID (compiled locally) vs compile in browser */}
         <div className="flex gap-2 mb-3">
           {(['paste', 'compile'] as const).map(m => (
-            <span key={m} onClick={() => setMode(m)}
+            <button type="button" key={m} onClick={() => setMode(m)}
               className="vlink text-[11px] px-3 py-2"
               style={{ fontFamily: MONO, border: '1px solid #242424', borderRadius: 2, cursor: 'pointer',
                 background: mode === m ? 'rgba(20,184,138,.1)' : 'transparent', color: mode === m ? '#14B88A' : '#8A8A8A' }}>
-              {m === 'paste' ? 'Paste ImageID' : 'Compile in browser'}
-            </span>
+              {m === 'paste' ? 'Paste ImageID' : 'Compile locally'}
+            </button>
           ))}
         </div>
 
@@ -165,20 +172,19 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
           <div style={{ fontFamily: SANS, fontSize: 11, color: '#5A5A5A', marginBottom: 8 }}>
             edit the rule that defines a valid exploit — our server compiles it &amp; fills the ImageID
           </div>
-          {/* AI guest-gen (claude -p) */}
           <div style={{ border: '1px solid #1f2f29', background: '#0c1411', borderRadius: 2, padding: 10, marginBottom: 10 }}>
-            <div style={{ fontFamily: SANS, fontSize: 12, color: '#14B88A', marginBottom: 6 }}>✨ Generate with AI</div>
+            <div style={{ fontFamily: SANS, fontSize: 12, color: '#14B88A', marginBottom: 6 }}>Draft verification rule with the agent</div>
             <textarea value={aiDesc} onChange={e => setAiDesc(e.target.value)} rows={3}
-              placeholder="Describe the contract &amp; its invariant — e.g. 'a vault that assumes a*b can never equal target=1,000,000 with non-trivial a,b'…"
+              placeholder="Paste the Solidity source or describe the exact invariant the proof must check."
               style={{ ...inputSty, fontSize: 12, lineHeight: 1.5, resize: 'vertical' }} />
             <div className="flex items-center gap-3 mt-2">
               <button type="button" onClick={onGenerate} disabled={generating}
                 style={{ background: 'transparent', color: '#14B88A', border: '1px solid #14B88A', padding: '8px 14px', fontFamily: SANS, fontWeight: 600, fontSize: 12, borderRadius: 2, cursor: generating ? 'not-allowed' : 'pointer' }}>
-                {generating ? 'Generating…' : 'Generate with AI →'}
+                {generating ? 'Drafting…' : 'Draft guest'}
               </button>
               {genMsg && <span style={{ fontFamily: MONO, fontSize: 11, color: genMsg.startsWith('✗') ? '#E06A6A' : '#8A8A8A' }}>{genMsg}</span>}
             </div>
-            <div style={{ fontFamily: SANS, fontSize: 10, color: '#5A5A5A', marginTop: 6 }}>AI writes a draft — review/edit before compiling.</div>
+            <div style={{ fontFamily: SANS, fontSize: 10, color: '#5A5A5A', marginTop: 6 }}>The agent writes a draft. Compare every assertion with the deployed contract before compiling.</div>
           </div>
 
           <textarea
@@ -191,7 +197,7 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
           <div className="flex items-center gap-3 mt-2">
             <button type="button" onClick={onCompile} disabled={compiling}
               style={{ background: compiling ? '#5A5A5A' : '#14B88A', color: '#06241B', border: 'none', padding: '9px 16px', fontFamily: SANS, fontWeight: 600, fontSize: 13, borderRadius: 2, cursor: compiling ? 'not-allowed' : 'pointer' }}>
-              {compiling ? 'Compiling…' : 'Compile guest →'}
+              {compiling ? 'Compiling…' : 'Compile guest'}
             </button>
             {compileMsg && <span style={{ fontFamily: MONO, fontSize: 11, color: compileMsg.startsWith('✗') ? '#E06A6A' : '#8A8A8A' }}>{compileMsg}</span>}
           </div>
@@ -214,14 +220,15 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
             <input className="vinput" value={form.reward} onChange={e => onRewardChange(e.target.value)} placeholder="500"
               style={{ ...inputSty, flex: 1, width: 'auto' }} />
             <div className="flex" style={{ border: '1px solid #242424', borderRadius: 2, overflow: 'hidden' }}>
-              {(['XLM', 'USDC'] as Token[]).map((t, i) => (
-                <span key={t} onClick={() => onToken(t)}
+              {(['BNB', 'USDT'] as Token[]).map((t, i) => (
+                <button type="button" key={t} onClick={() => onToken(t)}
                   className="vlink text-[11px] md:text-[12px] px-3 md:px-4 py-3 cursor-pointer"
                   style={{
                     fontFamily: MONO, background: tokenBg(t), color: tokenClr(t),
                     borderLeft: i > 0 ? '1px solid #242424' : 'none',
+                    borderTop: 'none', borderRight: 'none', borderBottom: 'none',
                   }}
-                >{t}</span>
+                >{t}</button>
               ))}
             </div>
           </div>
@@ -232,7 +239,7 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
         <div className="flex gap-3 mb-7">
           <div style={{ flex: 1 }}>
             <label style={{ display: 'block', fontFamily: SANS, fontWeight: 500, fontSize: 13, color: '#EDEDED', marginBottom: 8 }}>
-              Hunter stake (XLM)
+              Hunter stake ({form.token})
             </label>
             <input className="vinput w-full" value={form.stake} onChange={e => onStakeChange(e.target.value)} placeholder="100" style={inputSty} />
             <div style={{ fontFamily: SANS, fontSize: 11, color: '#5A5A5A', marginTop: 7 }}>locked on claim · returned when the hunter reveals the real exploit</div>
@@ -263,18 +270,13 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
         >
           <span style={{ fontSize: 13, color: '#8A8A8A', marginTop: 1 }}>ⓘ</span>
           <span style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A', lineHeight: 1.55 }}>
-            Opening calls <span style={{ color: '#EDEDED' }}>create_bounty()</span> then <span style={{ color: '#EDEDED' }}>fund()</span> via your wallet — two signatures.
+            Native BNB opens the bounty in one transaction. BEP-20 rewards require an approval followed by the bounty transaction.
           </span>
         </div>
 
         <button onClick={onSubmit} disabled={busy} className="vbtn"
           style={{ width: '100%', background: busy ? '#5A5A5A' : '#EDEDED', color: '#0A0A0A', border: 'none', padding: 16, fontFamily: SANS, fontWeight: 600, fontSize: 15, borderRadius: 2, cursor: busy ? 'not-allowed' : 'pointer' }}
         >{busy ? 'Opening…' : 'Open bounty & lock reward'}</button>
-        <div className="text-center mt-4 md:mt-5">
-          <span className="vlink" style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A5A', cursor: 'pointer', textDecoration: 'underline' }}>
-            Advanced / how guests work ↓
-          </span>
-        </div>
       </div>
     </div>
   )

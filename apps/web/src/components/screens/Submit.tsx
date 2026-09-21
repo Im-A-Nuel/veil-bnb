@@ -1,6 +1,7 @@
 'use client'
 
 import { Bounty, Screen } from '@/lib/data'
+import { explorerAddressUrl } from '@/lib/chain'
 
 const MONO  = "var(--font-mono,'JetBrains Mono',monospace)"
 const SERIF = "var(--font-serif,'Instrument Serif',serif)"
@@ -28,9 +29,9 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
 
   return (
     <div className="max-w-[880px] mx-auto px-5 md:px-10 pt-8 md:pt-10 pb-16 md:pb-20">
-      <div onClick={() => go('hunt')} className="vlink inline-block"
-        style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A', cursor: 'pointer', marginBottom: 20 }}
-      >← back to bounties</div>
+      <button type="button" onClick={() => go('hunt')} className="vlink inline-block"
+        style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A', cursor: 'pointer', marginBottom: 20, background: 'transparent', border: 0, padding: 0 }}
+      >← back to bounties</button>
 
       <div style={{ background: '#111111', border: '1px solid #242424' }}>
         {/* header */}
@@ -56,7 +57,7 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
           {bounty.victimFull && (
             <div style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A', marginBottom: 18 }}>
               victim contract:{' '}
-              <a href={`https://stellar.expert/explorer/testnet/contract/${bounty.victimFull}`} target="_blank" rel="noreferrer" style={{ color: '#14B88A' }}>{bounty.victim} ↗</a>
+              <a href={explorerAddressUrl(bounty.victimFull)} target="_blank" rel="noreferrer" style={{ color: '#14B88A' }}>{bounty.victim} <span className="sr-only">on BscScan</span></a>
             </div>
           )}
 
@@ -66,7 +67,7 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
             <li>Poke the victim contract above → find the secret input that breaks it.</li>
             <li>Generate the proof <b style={{ color: '#EDEDED' }}>on your own machine</b> (your secret never leaves):
               <div style={{ marginTop: 6, fontFamily: MONO, fontSize: 12, color: '#8A8A8A' }}>
-                • have toolchain → <a href="/api/guest" download style={{ color: '#14B88A' }}>download project</a> → extract → <code style={{ color: '#CDCDCD' }}>cargo run --release --bin host -- &lt;a&gt; &lt;b&gt;</code><br />
+                • have toolchain → <a href="/api/guest" download style={{ color: '#14B88A' }}>download project</a> → extract → <code style={{ color: '#CDCDCD' }}>cargo run --release --bin host -- &lt;a&gt; &lt;b&gt; &lt;victim-address&gt; &lt;bounty-id&gt;</code><br />
                 • no toolchain → <a href="/api/prover" download style={{ color: '#14B88A' }}>download prover</a> (needs Docker)
               </div>
             </li>
@@ -125,16 +126,16 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
         {/* dropzone */}
         <div className="px-5 md:px-8 py-5 md:py-8" style={{ borderBottom: '1px solid #242424' }}>
           {!fileLoaded ? (
-            <div onClick={onPickFile} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+            <button type="button" onClick={onPickFile} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
               className="vinput text-center cursor-pointer py-8 md:py-10 px-5"
-              style={{ border: `1px dashed ${dropBorder}`, background: dropBg, borderRadius: 2 }}
+              style={{ border: `1px dashed ${dropBorder}`, background: dropBg, borderRadius: 2, width: '100%' }}
             >
               <div style={{ fontSize: 22, color: '#5A5A5A', marginBottom: 12 }}>⤓</div>
               <div style={{ fontFamily: MONO, fontSize: 14, color: '#EDEDED', marginBottom: 6 }}>
                 drop <span style={{ color: '#14B88A' }}>proof.json</span> or click to browse
               </div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A' }}>RISC Zero proof · journal + seal</div>
-            </div>
+            </button>
           ) : (
             <div className="flex items-center justify-between px-4 md:px-5 py-4"
               style={{ border: '1px solid rgba(20,184,138,.35)', background: 'rgba(20,184,138,.04)', borderRadius: 2 }}
@@ -146,10 +147,10 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
                   <div style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A' }}>2.4 MB · loaded locally</div>
                 </div>
               </div>
-              <span onClick={onPickFile} style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A', cursor: 'pointer', textDecoration: 'underline' }}>replace</span>
+              <button type="button" onClick={onPickFile} className="vlink" style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A', cursor: 'pointer', textDecoration: 'underline', background: 'transparent', border: 0 }}>replace</button>
             </div>
           )}
-          <input id="veil-file" type="file" onChange={onPick} style={{ display: 'none' }} />
+          <input id="veil-file" type="file" accept="application/json,.json" onChange={onPick} className="sr-only" />
         </div>
 
         {/* checklist */}

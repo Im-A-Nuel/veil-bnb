@@ -181,7 +181,7 @@ export default function FlowDiagram() {
             </Container>
 
             {/* payout */}
-            <Leaf x={1170} y={317} w={124} h={66} label="PAYOUT" value="2,500 XLM" accent />
+            <Leaf x={1170} y={317} w={124} h={66} label="PAYOUT" value="0.5 BNB" accent />
           </svg>
         </div>
       </div>

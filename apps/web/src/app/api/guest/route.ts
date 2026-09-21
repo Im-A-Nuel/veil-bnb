@@ -1,12 +1,12 @@
 // GET /api/guest → download proyek prover lengkap (guest + host) sebagai tar.gz.
-// Hunter (punya toolchain): extract → `cargo run --release --bin host -- <a> <b>` → proof.json.
+// Hunter: extract, then run the host with the secret and public bounty binding.
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
-  const repoRoot = join(process.cwd(), '..')
+  const repoRoot = join(process.cwd(), '..', '..')
   try {
     const buf = await new Promise<Buffer>((resolve, reject) => {
       execFile(
@@ -24,6 +24,6 @@ export async function GET() {
       },
     })
   } catch (e) {
-    return new Response('gagal paket proyek: ' + (e instanceof Error ? e.message : ''), { status: 500 })
+    return new Response('Could not package the prover project: ' + (e instanceof Error ? e.message : ''), { status: 500 })
   }
 }

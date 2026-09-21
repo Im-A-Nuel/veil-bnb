@@ -6,7 +6,7 @@ import { join } from 'node:path'
 export const runtime = 'nodejs'
 
 export async function GET() {
-  const path = join(process.cwd(), '..', 'zk', 'target', 'release', 'host')
+  const path = join(process.cwd(), '..', '..', 'zk', 'target', 'release', 'host')
   try {
     const bin = await readFile(path)
     return new Response(bin, {
@@ -16,6 +16,6 @@ export async function GET() {
       },
     })
   } catch {
-    return new Response('prover belum di-build (jalankan: cd zk && cargo build --release)', { status: 404 })
+    return new Response('Prover is not built. Run: cd zk && cargo build --release --bin host', { status: 404 })
   }
 }

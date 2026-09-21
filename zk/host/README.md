@@ -1,6 +1,6 @@
 # zk/host — Host Program
 
-Terima input rahasia dari hunter, jalankan guest, hasilkan receipt, ekspor ke format yang bisa dikirim ke kontrak Stellar (`claim()`).
+Terima input rahasia dari hunter, jalankan guest, hasilkan receipt, lalu ekspor journal dan seal EVM untuk `VeilBountyRegistry.claim()`.
 
 - Iterasi pakai `RISC0_DEV_MODE=1` (cepat).
 - Proof asli untuk demo: `RISC0_DEV_MODE=0` (butuh Docker).

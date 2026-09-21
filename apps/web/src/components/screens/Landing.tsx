@@ -15,7 +15,7 @@ const SANS  = "var(--font-sans,'Inter',sans-serif)"
 
 const FEATURES = [
   { title: 'Zero-knowledge proofs',  desc: "Prove the exploit is real without revealing a single byte of how you did it." },
-  { title: 'On-chain verification',  desc: "RISC Zero receipts are verified inside the Soroban contract — no trusted middleman." },
+  { title: 'On-chain verification',  desc: "RISC Zero receipts are checked by a Solidity verifier before the BSC escrow releases funds." },
   { title: 'Automatic payout',       desc: "A valid proof releases the escrow in the same transaction. No negotiation, no delay." },
   { title: 'Open-source rules',      desc: "Each bounty's ImageID pins the exact guest program that defines a valid break." },
   { title: 'No disclosure risk',     desc: "The vulnerability is proven, not published. Nothing leaks to the contract or the chain." },
@@ -67,24 +67,24 @@ export default function Landing({ go, connectWallet, connected, address }: Props
       >
         {/* left: logo + links */}
         <div className="flex items-center gap-8 md:gap-12">
-          <div
+          <button type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="vbtn"
-            style={{ fontFamily: MONO, fontWeight: 700, letterSpacing: '.34em', cursor: 'pointer', color: '#EDEDED', fontSize: 17 }}
+            style={{ fontFamily: MONO, fontWeight: 700, letterSpacing: '.34em', cursor: 'pointer', color: '#EDEDED', fontSize: 17, background: 'transparent', border: 0, padding: 0 }}
           >
             VEIL
-          </div>
+          </button>
           {/* nav links — desktop only */}
           <div className="hidden md:flex gap-[30px]">
             {[
               { label: 'Features',     id: 'features',   fn: () => scrollTo('features') },
               { label: 'How it works', id: 'howitworks', fn: () => scrollTo('howitworks') },
               { label: 'Bounties',     id: '',           fn: () => go('hunt') },
-              { label: 'Docs',         id: '',           fn: () => {} },
+              { label: 'Docs',         id: '',           fn: () => window.open('https://github.com/Im-A-Nuel/veil-bnb/tree/main/docs', '_blank', 'noopener,noreferrer') },
             ].map(({ label, id, fn }) => (
-              <span key={label} onClick={fn} className="vlink"
-                style={{ fontFamily: MONO, fontSize: 13, letterSpacing: '.02em', cursor: 'pointer', ...navLink(id) }}
-              >{label}</span>
+              <button type="button" key={label} onClick={fn} className="vlink"
+                style={{ fontFamily: MONO, fontSize: 13, letterSpacing: '.02em', cursor: 'pointer', background: 'transparent', border: 0, padding: 0, ...navLink(id) }}
+              >{label}</button>
             ))}
           </div>
         </div>
@@ -117,9 +117,9 @@ export default function Landing({ go, connectWallet, connected, address }: Props
             { label: 'Bounties',     fn: () => go('hunt') },
             { label: 'Create bounty',fn: () => go('create') },
           ].map(({ label, fn }) => (
-            <div key={label} onClick={fn} className="vlink px-5 py-4"
-              style={{ fontFamily: MONO, fontSize: 14, color: '#8A8A8A', borderBottom: '1px solid #1a1a1a', cursor: 'pointer' }}
-            >{label}</div>
+            <button type="button" key={label} onClick={fn} className="vlink px-5 py-4 text-left w-full"
+              style={{ fontFamily: MONO, fontSize: 14, color: '#8A8A8A', border: 0, borderBottom: '1px solid #1a1a1a', cursor: 'pointer', background: 'transparent' }}
+            >{label}</button>
           ))}
         </div>
       )}
@@ -141,7 +141,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
             >
               <span style={{ width: 5, height: 5, background: '#14B88A', display: 'inline-block' }} />
               <span style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A', letterSpacing: '.14em', textTransform: 'uppercase' }}>
-                Trustless proof-of-exploit · Stellar
+                Trustless proof-of-exploit · BNB Chain
               </span>
             </Reveal>
             <Reveal delay={80} y={16}>
@@ -197,7 +197,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
       >
         <span style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A', letterSpacing: '.2em', textTransform: 'uppercase', flexShrink: 0 }}>Built on</span>
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
-          {['Stellar', 'Soroban', 'RISC Zero', 'Zero-Knowledge'].map((t) => (
+          {['BNB Chain', 'Solidity', 'RISC Zero', 'Zero-Knowledge'].map((t) => (
             <span key={t} className="vlink inline-flex items-center gap-2"
               style={{
                 fontFamily: MONO, fontSize: 13, color: '#EDEDED', letterSpacing: '.01em',
@@ -294,7 +294,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
                         </div>
                       ))}
                       <div className="mt-3 px-3 py-2" style={{ background: 'rgba(20,184,138,.07)', border: '1px solid rgba(20,184,138,.25)', borderRadius: 4, fontSize: 11, color: '#14B88A' }}>
-                        PROOF VALID → transfer 2,500 XLM
+                        PROOF VALID → transfer 0.5 BNB
                       </div>
                     </div>
                   )}
@@ -305,7 +305,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#14B88A', display: 'inline-block' }} />
                         <span style={{ fontSize: 10, color: '#14B88A' }}>confirmed · block #8,247,391</span>
                       </div>
-                      <div style={{ fontSize: 28, color: '#EDEDED', fontWeight: 600, letterSpacing: '-.01em', marginBottom: 3 }}>+2,500 XLM</div>
+                      <div style={{ fontSize: 28, color: '#EDEDED', fontWeight: 600, letterSpacing: '-.01em', marginBottom: 3 }}>+0.5 BNB</div>
                       <div style={{ fontSize: 11, color: '#4A4A4A', marginBottom: 16 }}>≈ $412.50 USD</div>
                       <div style={{ fontSize: 11, color: '#5A5A5A' }}>
                         <div style={{ marginBottom: 5 }}>From: bounty-verifier CA4F…</div>
@@ -427,7 +427,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
           <p className="text-[14px] md:text-[16px] max-w-[460px] mx-auto"
             style={{ lineHeight: 1.65, color: 'rgba(255,255,255,.48)', fontFamily: SANS, margin: '18px auto 36px' }}
           >
-            ZK proof on your machine. Stellar escrow. Automatic payout when the contract verifies.
+            ZK proof on your machine. BSC escrow. Automatic payout when the contract verifies.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4">
             <button onClick={() => go('hunt')}
@@ -451,7 +451,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
             <div>
               <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 16, letterSpacing: '.34em', color: '#EDEDED', marginBottom: 14 }}>VEIL</div>
               <p style={{ fontFamily: SANS, fontSize: 13, color: '#5A5A5A', lineHeight: 1.65, maxWidth: 300, margin: 0 }}>
-                Trustless proof-of-exploit on Stellar.<br />
+                Trustless proof-of-exploit on BNB Smart Chain.<br />
                 Zero-knowledge proofs. Automatic payout.
               </p>
             </div>
@@ -467,25 +467,23 @@ export default function Landing({ go, connectWallet, connected, address }: Props
                   { label: 'Bounties',     fn: () => go('hunt') },
                   { label: 'Create bounty',fn: () => go('create') },
                 ].map(({ label, fn }) => (
-                  <div key={label} onClick={fn} className="vlink w-fit"
-                    style={{ fontFamily: SANS, fontSize: 13, color: '#5A5A5A', marginBottom: 12, cursor: 'pointer', lineHeight: 1 }}
-                  >{label}</div>
+                  <button type="button" key={label} onClick={fn} className="vlink w-fit block"
+                    style={{ fontFamily: SANS, fontSize: 13, color: '#767676', marginBottom: 12, cursor: 'pointer', lineHeight: 1, background: 'transparent', border: 0, padding: 0 }}
+                  >{label}</button>
                 ))}
               </div>
 
               {/* Social */}
               <div>
                 <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 13, color: '#EDEDED', marginBottom: 18 }}>Social</div>
-                {['GitHub', 'Twitter / X', 'Discord'].map(l => (
-                  <div key={l} className="vlink w-fit" style={{ fontFamily: SANS, fontSize: 13, color: '#5A5A5A', marginBottom: 12, cursor: 'pointer', lineHeight: 1 }}>{l}</div>
-                ))}
+                <a href="https://github.com/Im-A-Nuel/veil-bnb" target="_blank" rel="noreferrer" className="vlink w-fit block" style={{ fontFamily: SANS, fontSize: 13, color: '#767676', marginBottom: 12, lineHeight: 1 }}>GitHub</a>
               </div>
 
               {/* Legal */}
               <div>
                 <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 13, color: '#EDEDED', marginBottom: 18 }}>Legal</div>
                 {['MIT License', 'Open source'].map(l => (
-                  <div key={l} className="vlink w-fit" style={{ fontFamily: SANS, fontSize: 13, color: '#5A5A5A', marginBottom: 12, cursor: 'pointer', lineHeight: 1 }}>{l}</div>
+                  <div key={l} className="w-fit" style={{ fontFamily: SANS, fontSize: 13, color: '#767676', marginBottom: 12, lineHeight: 1 }}>{l}</div>
                 ))}
               </div>
             </div>
@@ -495,8 +493,8 @@ export default function Landing({ go, connectWallet, connected, address }: Props
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-12 pt-6"
             style={{ borderTop: '1px solid #1c1c1c' }}
           >
-            <div style={{ fontFamily: MONO, fontSize: 11, color: '#383838', letterSpacing: '.02em' }}>© 2025 Veil · Stellar Hackathon</div>
-            <div style={{ fontFamily: MONO, fontSize: 11, color: '#383838', letterSpacing: '.02em' }}>RISC Zero · Soroban · ZK</div>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: '#666666', letterSpacing: '.02em' }}>© 2026 Veil · Indonesia Web3 Hackathon</div>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: '#666666', letterSpacing: '.02em' }}>RISC Zero · Solidity · BSC</div>
           </div>
         </Reveal>
       </footer>
