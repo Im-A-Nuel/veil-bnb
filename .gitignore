@@ -3,6 +3,7 @@ node_modules/
 out/
 dist/
 coverage/
+.cache/
 cache/
 broadcast/
 artifacts/
@@ -22,4 +23,3 @@ zk/proof.json
 zk/reveal.json
 zk/journal.hex
 zk/seal.bin
-
