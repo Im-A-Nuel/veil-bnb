@@ -9,10 +9,12 @@
     "dev": "npm run dev --workspace @veil/web",
     "build": "npm run build --workspace @veil/web",
     "typecheck": "npm run typecheck --workspace @veil/web",
-    "agent": "npm run dev --workspace @veil/agent"
+    "agent": "npm run dev --workspace @veil/agent",
+    "agent:start": "npm start --workspace @veil/agent",
+    "test:agent": "npm test --workspace @veil/agent",
+    "check": "powershell -ExecutionPolicy Bypass -File scripts/check.ps1"
   },
   "engines": {
     "node": ">=20"
   }
 }
-
