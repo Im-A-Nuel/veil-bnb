@@ -4,7 +4,8 @@ pragma solidity ^0.8.20;
 import { VeilBountyRegistry } from "../src/VeilBountyRegistry.sol";
 import { VictimVault } from "../src/VictimVault.sol";
 import { MockERC20 } from "../src/mocks/MockERC20.sol";
-import { MockRiscZeroVerifier } from "../src/mocks/MockRiscZeroVerifier.sol";
+import { IGroth16Verifier } from "../src/interfaces/IGroth16Verifier.sol";
+import { MockGroth16Verifier } from "../src/mocks/MockGroth16Verifier.sol";
 
 interface VmLocalScript {
     function envUint(string calldata name) external view returns (uint256);
@@ -20,7 +21,7 @@ contract DeployLocal {
     function run()
         external
         returns (
-            MockRiscZeroVerifier verifier,
+            MockGroth16Verifier verifier,
             VeilBountyRegistry registry,
             VictimVault victim,
             MockERC20 token
@@ -30,13 +31,12 @@ contract DeployLocal {
         address deployer = vm.addr(privateKey);
 
         vm.startBroadcast(privateKey);
-        verifier = new MockRiscZeroVerifier();
+        verifier = new MockGroth16Verifier();
         verifier.setAcceptAll(true);
-        registry = new VeilBountyRegistry(verifier);
+        registry = new VeilBountyRegistry(IGroth16Verifier(address(verifier)));
         victim = new VictimVault(1_000_000);
         token = new MockERC20();
         token.mint(deployer, 1_000_000 ether);
         vm.stopBroadcast();
     }
 }
-

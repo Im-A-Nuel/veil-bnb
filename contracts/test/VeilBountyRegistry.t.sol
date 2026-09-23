@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { VeilBountyRegistry } from "../src/VeilBountyRegistry.sol";
 import { VictimVault } from "../src/VictimVault.sol";
 import { MockERC20 } from "../src/mocks/MockERC20.sol";
-import { MockRiscZeroVerifier } from "../src/mocks/MockRiscZeroVerifier.sol";
+import { MockGroth16Verifier } from "../src/mocks/MockGroth16Verifier.sol";
 
 interface Vm {
     function deal(address who, uint256 newBalance) external;
@@ -18,7 +18,7 @@ interface Vm {
 contract VeilBountyRegistryTest {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    MockRiscZeroVerifier private proofVerifier;
+    MockGroth16Verifier private proofVerifier;
     VeilBountyRegistry private registry;
     VictimVault private victim;
     MockERC20 private token;
@@ -26,13 +26,18 @@ contract VeilBountyRegistryTest {
     address private constant CREATOR = address(0xC0FFEE);
     address private constant HUNTER = address(0xB0B);
     address private constant KEEPER = address(0xCAFE);
-    bytes32 private constant IMAGE_ID = keccak256("veil-demo-guest");
+    bytes32 private constant VK_HASH = keccak256("veil-demo-vk");
     bytes32 private constant PUBKEY = keccak256("creator-reveal-key");
     uint256 private constant REWARD = 5 ether;
     uint256 private constant STAKE = 1 ether;
 
+    // Dummy proof values — verifier is MockGroth16Verifier with acceptAll=true
+    uint[2] private PI_A = [uint(1), 2];
+    uint[2][2] private PI_B = [[uint(3), 4], [uint(5), 6]];
+    uint[2] private PI_C = [uint(7), 8];
+
     function setUp() public {
-        proofVerifier = new MockRiscZeroVerifier();
+        proofVerifier = new MockGroth16Verifier();
         registry = new VeilBountyRegistry(proofVerifier);
         victim = new VictimVault(1_000_000);
         token = new MockERC20();
@@ -64,19 +69,25 @@ contract VeilBountyRegistryTest {
 
     function testClaimPaysRewardAndLocksStake() public {
         uint256 id = _createNative(REWARD, STAKE, 0);
-        bytes memory reveal = abi.encode(uint256(1000), uint256(1000), bytes32("secret salt"));
-        bytes32 fingerprint = sha256(reveal);
         proofVerifier.setAcceptAll(true);
+
+        // pubSignals: [fp_hi, fp_lo, victim_uint, bountyId, target]
+        uint[5] memory pubSignals = [
+            uint(1),              // fingerprint_hi (non-zero)
+            uint(2),              // fingerprint_lo
+            uint160(address(victim)), // victim_as_uint
+            id,                   // bountyId
+            uint(1_000_000)       // target
+        ];
 
         uint256 beforeBalance = HUNTER.balance;
         vm.prank(HUNTER);
-        registry.claim{ value: STAKE }(id, abi.encode(address(victim), id, fingerprint), hex"cafe");
+        registry.claim{ value: STAKE }(id, PI_A, PI_B, PI_C, pubSignals);
 
         VeilBountyRegistry.Bounty memory bounty = registry.getBounty(id);
         _assertEq(HUNTER.balance, beforeBalance - STAKE + REWARD);
         _assertEq(address(registry).balance, STAKE);
         _assertEq(bounty.hunter, HUNTER);
-        _assertEq(bounty.fingerprint, fingerprint);
         _assertEq(uint256(bounty.status), uint256(VeilBountyRegistry.Status.Claimed));
     }
 
@@ -84,18 +95,35 @@ contract VeilBountyRegistryTest {
         uint256 id = _createNative(REWARD, STAKE, 0);
         proofVerifier.setAcceptAll(true);
 
+        // victim_as_uint points to wrong address
+        uint[5] memory pubSignals = [
+            uint(1),
+            uint(2),
+            uint160(address(0xBAD)), // wrong victim
+            id,
+            uint(1_000_000)
+        ];
+
         vm.prank(HUNTER);
         vm.expectRevert(VeilBountyRegistry.InvalidJournal.selector);
-        registry.claim{ value: STAKE }(id, abi.encode(address(0xBAD), id, bytes32(uint256(1))), hex"cafe");
+        registry.claim{ value: STAKE }(id, PI_A, PI_B, PI_C, pubSignals);
     }
 
-    function testRejectsProofWhenVerifierReverts() public {
+    function testRejectsProofWhenVerifierReturnsFalse() public {
         uint256 id = _createNative(REWARD, STAKE, 0);
-        bytes memory journal = abi.encode(address(victim), id, bytes32(uint256(1)));
+        // proofVerifier.acceptAll is false by default
+
+        uint[5] memory pubSignals = [
+            uint(1),
+            uint(2),
+            uint160(address(victim)),
+            id,
+            uint(1_000_000)
+        ];
 
         vm.prank(HUNTER);
-        vm.expectRevert(MockRiscZeroVerifier.VerificationFailed.selector);
-        registry.claim{ value: STAKE }(id, journal, hex"dead");
+        vm.expectRevert(VeilBountyRegistry.InvalidJournal.selector);
+        registry.claim{ value: STAKE }(id, PI_A, PI_B, PI_C, pubSignals);
     }
 
     function testCreatorConfirmationReturnsStake() public {
@@ -112,12 +140,27 @@ contract VeilBountyRegistryTest {
     }
 
     function testHunterCanUseEscapeWindow() public {
-        bytes memory reveal = abi.encode(uint256(1000), uint256(1000), bytes32("private salt"));
         uint256 id = _createNative(REWARD, STAKE, 0);
         proofVerifier.setAcceptAll(true);
+
+        bytes memory reveal = abi.encode(uint256(1000), uint256(1000), bytes32("private salt"));
         bytes32 fingerprint = sha256(reveal);
+
+        // fingerprint_hi = upper 128 bits, fingerprint_lo = lower 128 bits
+        uint256 fp = uint256(fingerprint);
+        uint fpHi = fp >> 128;
+        uint fpLo = fp & ((1 << 128) - 1);
+
+        uint[5] memory pubSignals = [
+            fpHi,
+            fpLo,
+            uint160(address(victim)),
+            id,
+            uint(1_000_000)
+        ];
+
         vm.prank(HUNTER);
-        registry.claim{ value: STAKE }(id, abi.encode(address(victim), id, fingerprint), hex"cafe");
+        registry.claim{ value: STAKE }(id, PI_A, PI_B, PI_C, pubSignals);
         VeilBountyRegistry.Bounty memory claimed = registry.getBounty(id);
 
         vm.warp(uint256(claimed.claimedAt) + claimed.revealWindow - claimed.escapeWindow);
@@ -173,11 +216,19 @@ contract VeilBountyRegistryTest {
         vm.stopPrank();
 
         proofVerifier.setAcceptAll(true);
-        bytes memory reveal = abi.encode("token reveal");
+
+        uint[5] memory pubSignals = [
+            uint(1),
+            uint(2),
+            uint160(address(victim)),
+            id,
+            uint(1_000_000)
+        ];
+
         vm.startPrank(HUNTER);
         token.approve(address(registry), STAKE);
         uint256 hunterBefore = token.balanceOf(HUNTER);
-        registry.claim(id, abi.encode(address(victim), id, sha256(reveal)), hex"cafe");
+        registry.claim(id, PI_A, PI_B, PI_C, pubSignals);
         vm.stopPrank();
 
         _assertEq(token.balanceOf(HUNTER), hunterBefore - STAKE + REWARD);
@@ -196,12 +247,25 @@ contract VeilBountyRegistryTest {
     }
 
     function _claimedNativeBounty() private returns (uint256 id) {
-        bytes memory reveal = abi.encode(uint256(1000), uint256(1000), bytes32("secret salt"));
-        bytes32 fingerprint = sha256(reveal);
         id = _createNative(REWARD, STAKE, 0);
         proofVerifier.setAcceptAll(true);
+
+        bytes memory reveal = abi.encode(uint256(1000), uint256(1000), bytes32("secret salt"));
+        bytes32 fingerprint = sha256(reveal);
+        uint256 fp = uint256(fingerprint);
+        uint fpHi = fp >> 128;
+        uint fpLo = fp & ((1 << 128) - 1);
+
+        uint[5] memory pubSignals = [
+            fpHi,
+            fpLo,
+            uint160(address(victim)),
+            id,
+            uint(1_000_000)
+        ];
+
         vm.prank(HUNTER);
-        registry.claim{ value: STAKE }(id, abi.encode(address(victim), id, fingerprint), hex"cafe");
+        registry.claim{ value: STAKE }(id, PI_A, PI_B, PI_C, pubSignals);
     }
 
     function _createNative(uint256 reward, uint256 stake, uint64 expiry) private returns (uint256 id) {
@@ -220,7 +284,7 @@ contract VeilBountyRegistryTest {
             token: rewardToken,
             rewardAmount: reward,
             stakeAmount: stake,
-            imageId: IMAGE_ID,
+            vkHash: VK_HASH,
             creatorPubkey: PUBKEY,
             revealWindow: stake == 0 ? 0 : 1 hours,
             escapeWindow: stake == 0 ? 0 : 15 minutes,
