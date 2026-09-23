@@ -134,7 +134,7 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
               <div style={{ fontFamily: MONO, fontSize: 14, color: '#EDEDED', marginBottom: 6 }}>
                 drop <span style={{ color: '#14B88A' }}>proof.json</span> or click to browse
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A' }}>RISC Zero proof · journal + seal</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A' }}>Groth16 proof · pi_a · pi_b · pi_c · publicSignals</div>
             </button>
           ) : (
             <div className="flex items-center justify-between px-4 md:px-5 py-4"

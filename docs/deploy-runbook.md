@@ -1,44 +1,55 @@
 # Deploy & Demo Runbook — BSC Testnet
 
-Jalankan langkah-langkah ini secara berurutan. Semua perintah dari WSL kecuali yang berlabel **[PowerShell]**.
+Jalankan langkah-langkah ini secara berurutan. Semua perintah PowerShell (Windows native — tidak butuh WSL).
 
 ---
 
 ## Prasyarat
 
-- WSL distro dengan Foundry terinstall (`~/.foundry/bin/forge`)
-- Rust toolchain di WSL (sesuai `zk/rust-toolchain.toml`)
+- Node.js 20+ dan npm
+- circom binary (Windows) — [download dari GitHub](https://github.com/iden3/circom/releases), rename jadi `circom.exe`, taruh di PATH
+- Foundry (`forge`) — [install via foundryup-windows](https://book.getfoundry.sh/getting-started/installation)
 - Wallet dengan tBNB testnet (faucet: https://www.bnbchain.org/en/testnet-faucet)
-- Node.js 20+ dan npm (untuk web app)
 - MetaMask/Rabby di browser, BSC Testnet (chain 97) sudah ditambahkan
 
 ---
 
-## Langkah 1 — Build prover dan dapatkan ImageID
+## Langkah 1 — ZK Setup (satu kali)
 
-```bash
-cd /path/to/veil-bnb/zk
-cargo build --release --bin host
+```powershell
+cd zk
+npm install
+node scripts/setup.mjs
 ```
 
-> Build pertama bisa 10–30 menit. Subsequent build jauh lebih cepat.
+Proses:
+1. Download `powersOfTau28_hez_final_15.ptau` (~1 MB) dari Hermez ceremony
+2. Compile `circuits/exploit.circom` dengan circom
+3. Generate `circuit_final.zkey`
+4. Export `verification_key.json`
+5. Generate `contracts/src/Groth16Verifier.sol`
 
-Setelah build selesai, jalankan prover dengan witness dummy untuk mendapatkan ImageID:
-
-```bash
-# a=1000, b=1000, victim=address dummy, bountyId=0 (hanya untuk ambil ImageID)
-RISC0_PROVER=local cargo run --release --bin host -- \
-  1000 1000 \
-  0x0000000000000000000000000000000000000001 \
-  0
+Output yang diharapkan:
+```
+=== Veil ZK Setup ===
+[1/5] Download Powers of Tau (Hermez ceremony)...
+[2/5] Compile circuit...
+[3/5] Generate zkey (phase 1)...
+[4/5] Contribute beacon entropy...
+[5/5] Export verification key and Solidity verifier...
+✓ Setup complete.
 ```
 
-Catat nilai `image id` dari output:
+Catat `vkHash` untuk dipakai di Langkah 3:
+```powershell
+# vkHash = keccak256 dari verification_key.json — hitung off-chain atau pakai tool:
+node -e "
+const fs = require('fs')
+const { keccak256, toBytes } = require('viem')
+const vk = fs.readFileSync('verification_key.json')
+console.log('vkHash:', keccak256(toBytes(vk)))
+"
 ```
-image id    : 0x<64-char-hex>   ← SALIN INI
-```
-
-> Simpan ImageID ini — akan dipakai di Langkah 3.
 
 ---
 
@@ -46,9 +57,9 @@ image id    : 0x<64-char-hex>   ← SALIN INI
 
 ### 2a. Buat `contracts/.env`
 
-```bash
-cd /path/to/veil-bnb/contracts
-cp .env.example .env
+```powershell
+cd contracts
+copy .env.example .env
 ```
 
 Edit `.env` dan isi:
@@ -57,12 +68,13 @@ BSC_TESTNET_RPC_URL=https://bsc-testnet-dataseed.bnbchain.org
 DEPLOYER_PRIVATE_KEY=<private key hex kamu, tanpa 0x>
 ```
 
+**JANGAN commit file `.env` ini ke git.**
+
 ### 2b. Dry-run (tanpa broadcast)
 
-```bash
-source .env
-~/.foundry/bin/forge script script/DeployTestnet.s.sol:DeployTestnet \
-  --rpc-url "$BSC_TESTNET_RPC_URL" \
+```powershell
+forge script script/DeployTestnet.s.sol:DeployTestnet `
+  --rpc-url $env:BSC_TESTNET_RPC_URL `
   --legacy
 ```
 
@@ -70,36 +82,25 @@ Expected: `Simulation complete` tanpa error.
 
 ### 2c. Broadcast deploy
 
-```bash
-~/.foundry/bin/forge script script/DeployTestnet.s.sol:DeployTestnet \
-  --rpc-url "$BSC_TESTNET_RPC_URL" \
-  --broadcast \
-  --legacy
+```powershell
+forge script script/DeployTestnet.s.sol:DeployTestnet `
+  --rpc-url $env:BSC_TESTNET_RPC_URL `
+  --broadcast --legacy
 ```
 
-Dari output, catat tiga alamat contract:
+Dari output, catat tiga alamat contract (cek di `contracts/broadcast/DeployTestnet.s.sol/97/run-latest.json`):
 ```
-# Contoh output di bagian "== Logs ==" atau "Deployed to":
-MockRiscZeroVerifier : 0xAAAA...
-VeilBountyRegistry   : 0xBBBB...
-VictimVault          : 0xCCCC...
-```
-
-Atau cek di `contracts/broadcast/DeployTestnet.s.sol/97/run-latest.json`:
-```bash
-cat broadcast/DeployTestnet.s.sol/97/run-latest.json | python3 -m json.tool | grep -A2 '"contractAddress"'
+MockGroth16Verifier : 0xAAAA...
+VeilBountyRegistry  : 0xBBBB...
+VictimVault         : 0xCCCC...
 ```
 
 ### 2d. Update `docs/submission-links.md`
 
-Isi tabel Deployments dengan alamat dan link BscScan:
-```
-https://testnet.bscscan.com/address/<alamat>
-```
+Isi tabel Deployments dengan alamat dan link BscScan.
 
 ### 2e. Update `apps/web/.env.local`
 
-Buka file `apps/web/.env.local` dan isi:
 ```dotenv
 NEXT_PUBLIC_REGISTRY_ADDRESS=0x<alamat VeilBountyRegistry>
 ```
@@ -108,7 +109,7 @@ NEXT_PUBLIC_REGISTRY_ADDRESS=0x<alamat VeilBountyRegistry>
 
 ## Langkah 3 — Buat bounty via UI
 
-**[PowerShell]** — Jalankan web app:
+Jalankan web app:
 ```powershell
 npm run dev
 ```
@@ -120,50 +121,52 @@ Buka `http://localhost:3000` di browser.
 
 | Field | Nilai |
 |---|---|
-| Victim address | `0x<alamat VictimVault dari Langkah 2>` |
-| Image ID | `0x<ImageID dari Langkah 1>` |
+| Victim contract address | `0x<alamat VictimVault dari Langkah 2>` |
+| vkHash | `0x<vkHash dari Langkah 1>` |
 | Creator pubkey | `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=` |
 | Title | `Demo · VictimVault Factoring` |
 | Description | `Prove non-trivial factors of 1,000,000 without revealing them. a*b=1000000, a>1, b>1.` |
 | Reward | `0.01` BNB |
-| Stake | (kosong / 0) |
+| Hunter stake | (kosong / 0) |
 | Token | BNB |
 
-3. Klik **Create Bounty** → konfirmasi di MetaMask
-4. Catat tx hash dari toast sukses atau dari MetaMask
+3. Klik **Open bounty & lock reward** → konfirmasi di MetaMask
+4. Catat bounty ID dari toast (biasanya `#0`)
 5. Update `docs/submission-links.md` baris `createBounty`
 
 ---
 
-## Langkah 4 — Generate proof dengan victim address dan bounty ID sesungguhnya
+## Langkah 4 — Generate proof
 
-```bash
-cd /path/to/veil-bnb/zk
-RISC0_PROVER=local cargo run --release --bin host -- \
-  1000 1000 \
-  0x<alamat VictimVault dari Langkah 2> \
-  0
+```powershell
+cd zk
+node scripts/prove.mjs 1000 1000 0x<alamat VictimVault> <bounty-id>
 ```
 
-> Bounty ID adalah `0` karena ini bounty pertama di registry.
-> Proses proving Groth16 memakan 5–30 menit.
+> Bounty ID adalah `0` kalau ini bounty pertama.
+> Proses Groth16 proving memakan ~10–30 detik.
 
 Output yang diharapkan:
 ```
-image id    : 0x<sama dengan Langkah 1>
-journal     : 96 bytes
-seal        : <N> bytes
-fingerprint : 0x<32-byte hex>
-proof.json is public; reveal.json must remain private until disclosure.
-```
+a           : 1000
+b           : 1000
+victim      : 0x<alamat VictimVault>
+bountyId    : 0
+salt        : 0x<64 hex chars>
+fingerprint : 0x<64 hex chars>
 
-File yang dihasilkan:
-- `zk/proof.json` — upload ke UI untuk claim
-- `zk/reveal.json` — simpan privat
+Generating witness and proof (Groth16)...
 
-Verifikasi isi proof.json:
-```bash
-python3 -c "import json,sys; d=json.load(open('proof.json')); print('imageId:', d['imageId'][:20]+'...'); print('journal len:', len(d['journal'])//2-1, 'bytes'); print('seal len:', len(d['seal'])//2-1, 'bytes')"
+✓ Done.
+  proof.json  : ...\zk\proof.json  (public — upload ke UI)
+  reveal.json : ...\zk\reveal.json  (private — simpan)
+
+publicSignals:
+  [0] <fingerprint_hi>
+  [1] <fingerprint_lo>
+  [2] <victim_as_uint>
+  [3] 0  (bountyId)
+  [4] 1000000  (target)
 ```
 
 ---
@@ -173,7 +176,7 @@ python3 -c "import json,sys; d=json.load(open('proof.json')); print('imageId:', 
 Di `http://localhost:3000`:
 
 1. Buka bounty **Demo · VictimVault Factoring**
-2. Klik **Submit Proof** / Hunt
+2. Klik **Hunt** / **Submit Proof**
 3. Drop atau browse file `zk/proof.json`
 4. Klik **Verify & claim reward**
 5. Konfirmasi transaksi di MetaMask
@@ -192,7 +195,7 @@ Update `docs/submission-links.md` baris `claim`.
 
 ## Langkah 6 — Final commit
 
-```bash
+```powershell
 git add docs/submission-links.md
 git commit -m "docs: add testnet deployment and claim transaction links"
 ```
@@ -205,13 +208,13 @@ git commit -m "docs: add testnet deployment and claim transaction links"
 Pastikan field Reward di UI sama persis dengan nilai yang dikirim sebagai `msg.value`. Jangan ada decimal yang salah.
 
 ### Claim gagal dengan `InvalidJournal`
-Pastikan bounty ID yang dipakai saat `cargo run -- ... 0` sesuai dengan ID bounty di contract. Bounty pertama selalu ID `0`.
-
-### Claim gagal dengan `InvalidImageId` atau `VerificationFailed`
-ImageID di bounty harus sama dengan ImageID dari binary prover. Ulangi Langkah 1 setelah rebuild jika perlu.
+Pastikan victim address dan bounty ID di proof.json sesuai dengan bounty yang di-claim. Regenerate proof dengan victim address yang benar.
 
 ### Forge script gagal `insufficient funds`
 Pastikan wallet punya cukup tBNB. Faucet: https://www.bnbchain.org/en/testnet-faucet
 
 ### RPC timeout
 Ganti RPC ke `https://data-seed-prebsc-1-s1.binance.org:8545` di `.env`.
+
+### circom: `command not found`
+Download circom binary dari https://github.com/iden3/circom/releases dan pastikan ada di PATH.

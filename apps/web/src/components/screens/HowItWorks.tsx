@@ -9,10 +9,10 @@ const SERIF = "var(--font-serif,'Instrument Serif',serif)"
 const SANS = "var(--font-sans,'Inter',sans-serif)"
 
 const STEPS = [
-  { n: '01', title: 'Open a bounty',   body: <>A creator locks a reward against a deployed contract and publishes the guest <span style={{ fontFamily: MONO, color: '#EDEDED' }}>ImageID</span> that defines a valid break.</> },
-  { n: '02', title: 'Break it locally', body: "A hunter finds the exploit and runs the open-source guest program on their own machine — the secret input never leaves it." },
-  { n: '03', title: 'Generate a proof', body: <>RISC Zero produces a receipt — a <span style={{ fontFamily: MONO, color: '#EDEDED' }}>journal + seal</span> — that proves the break happened, with nothing about how.</> },
-  { n: '04', title: 'Verify on-chain',  body: <>The hunter submits the receipt; the BSC registry verifies it against the <span style={{ fontFamily: MONO, color: '#EDEDED' }}>ImageID</span>, victim address, and bounty id.</> },
+  { n: '01', title: 'Open a bounty',   body: <>A creator locks a reward against a deployed contract and publishes the <span style={{ fontFamily: MONO, color: '#EDEDED' }}>vkHash</span> that binds the bounty to the correct proving circuit.</> },
+  { n: '02', title: 'Break it locally', body: "A hunter finds the exploit and runs the open-source Circom prover on their own machine — the secret input never leaves it." },
+  { n: '03', title: 'Generate a proof', body: <>SnarkJS (Groth16) produces a <span style={{ fontFamily: MONO, color: '#EDEDED' }}>proof.json</span> — pi_a, pi_b, pi_c, publicSignals — that proves the break happened, with nothing about how.</> },
+  { n: '04', title: 'Verify on-chain',  body: <>The hunter drops <span style={{ fontFamily: MONO, color: '#EDEDED' }}>proof.json</span> in the UI; the BSC registry calls <span style={{ fontFamily: MONO, color: '#EDEDED' }}>Groth16Verifier.verifyProof()</span> and checks the victim address and bounty id.</> },
   { n: '05', title: 'Get paid',         body: "On a valid proof, the contract releases the escrow to the hunter automatically — in the same transaction." },
 ]
 

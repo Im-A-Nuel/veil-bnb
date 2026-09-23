@@ -1,26 +1,27 @@
-# Veil RISC Zero prover
+# Veil ZK — Circom + SnarkJS prover
 
-The guest proves knowledge of non-trivial factors for the demo `VictimVault`. Its 96-byte journal is ABI-compatible with the BSC registry:
+The circuit proves knowledge of non-trivial factors for the demo `VictimVault`:
+- `a * b == 1_000_000` with `a > 1`, `b > 1`, `a < target`, `b < target`
+- Fingerprint = `sha256(pad128(a) ++ pad128(b) ++ salt)` committed publicly
+- Victim address and bounty ID bound as public signals
 
-```solidity
-abi.encode(victimAddress, bountyId, sha256(revealPreimage))
+Public signals order: `[fingerprint_hi, fingerprint_lo, victim_as_uint, bountyId, target]`
+
+## One-time setup
+
+```powershell
+npm install
+node scripts/setup.mjs
 ```
 
-The exploit witness and salt stay private. Only the victim address, bounty id, and reveal fingerprint become public.
+Downloads ptau, compiles the circuit, generates `circuit_final.zkey`, exports `verification_key.json` and `contracts/src/Groth16Verifier.sol`.
 
 ## Generate a proof
 
-Install the RISC Zero toolchain and Docker, then run:
-
-```bash
-cd zk
-cargo run --release --bin host -- \
-  1000 1000 \
-  0x1111111111111111111111111111111111111111 \
-  0
+```powershell
+node scripts/prove.mjs 1000 1000 0x<victim-address> <bounty-id>
 ```
 
-The host writes:
-
-- `proof.json` — public `imageId`, `journal`, and EVM-encoded Groth16 `seal`.
-- `reveal.json` — private witness material and the exact preimage used by `proveReveal`.
+Outputs:
+- `zk/proof.json` — `{ pi_a, pi_b, pi_c, publicSignals }` — upload to UI
+- `zk/reveal.json` — `{ a, b, salt }` — keep private

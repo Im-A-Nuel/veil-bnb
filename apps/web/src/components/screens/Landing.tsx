@@ -15,9 +15,9 @@ const SANS  = "var(--font-sans,'Inter',sans-serif)"
 
 const FEATURES = [
   { title: 'Zero-knowledge proofs',  desc: "Prove the exploit is real without revealing a single byte of how you did it." },
-  { title: 'On-chain verification',  desc: "RISC Zero receipts are checked by a Solidity verifier before the BSC escrow releases funds." },
+  { title: 'On-chain verification',  desc: "Groth16 proofs are checked by a Solidity verifier before the BSC escrow releases funds." },
   { title: 'Automatic payout',       desc: "A valid proof releases the escrow in the same transaction. No negotiation, no delay." },
-  { title: 'Open-source rules',      desc: "Each bounty's ImageID pins the exact guest program that defines a valid break." },
+  { title: 'Open-source rules',      desc: "Each bounty's vkHash pins the exact Circom circuit that defines a valid break." },
   { title: 'No disclosure risk',     desc: "The vulnerability is proven, not published. Nothing leaks to the contract or the chain." },
   { title: 'Permissionless',         desc: "Anyone can open a bounty or claim one. The contract is the only arbiter." },
 ]
@@ -197,7 +197,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
       >
         <span style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A5A', letterSpacing: '.2em', textTransform: 'uppercase', flexShrink: 0 }}>Built on</span>
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
-          {['BNB Chain', 'Solidity', 'RISC Zero', 'Zero-Knowledge'].map((t) => (
+          {['BNB Chain', 'Solidity', 'Circom', 'Groth16', 'Zero-Knowledge'].map((t) => (
             <span key={t} className="vlink inline-flex items-center gap-2"
               style={{
                 fontFamily: MONO, fontSize: 13, color: '#EDEDED', letterSpacing: '.01em',
@@ -494,7 +494,7 @@ export default function Landing({ go, connectWallet, connected, address }: Props
             style={{ borderTop: '1px solid #1c1c1c' }}
           >
             <div style={{ fontFamily: MONO, fontSize: 11, color: '#666666', letterSpacing: '.02em' }}>© 2026 Veil · Indonesia Web3 Hackathon</div>
-            <div style={{ fontFamily: MONO, fontSize: 11, color: '#666666', letterSpacing: '.02em' }}>RISC Zero · Solidity · BSC</div>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: '#666666', letterSpacing: '.02em' }}>Circom · Groth16 · Solidity · BSC</div>
           </div>
         </Reveal>
       </footer>

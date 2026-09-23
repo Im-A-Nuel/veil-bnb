@@ -29,4 +29,3 @@ zk/circuits/*.r1cs
 zk/circuits/*.sym
 zk/circuits/*.wasm
 zk/circuits/*_js/
-zk/verification_key.json

@@ -26,9 +26,9 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'Veil — Trustless Proof-of-Exploit',
-  description: 'Prove the exploit. Reveal nothing. Private bug bounties on BNB Smart Chain with RISC Zero proofs.',
+  description: 'Prove the exploit. Reveal nothing. Private bug bounties on BNB Smart Chain with Groth16 ZK proofs.',
   applicationName: 'Veil',
-  keywords: ['zero-knowledge', 'bug bounty', 'BNB Chain', 'BSC', 'RISC Zero', 'proof of exploit'],
+  keywords: ['zero-knowledge', 'bug bounty', 'BNB Chain', 'BSC', 'Circom', 'Groth16', 'proof of exploit'],
   openGraph: {
     title: 'Veil — Trustless Proof-of-Exploit',
     description: 'Prove the exploit. Reveal nothing. Private bug bounties on BNB Smart Chain.',

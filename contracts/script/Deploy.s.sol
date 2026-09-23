@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { VeilBountyRegistry } from "../src/VeilBountyRegistry.sol";
-import { IRiscZeroVerifier } from "../src/interfaces/IRiscZeroVerifier.sol";
+import { IGroth16Verifier } from "../src/interfaces/IGroth16Verifier.sol";
 
 interface VmScript {
     function envAddress(string calldata name) external view returns (address);
@@ -16,11 +16,10 @@ contract Deploy {
 
     function run() external returns (VeilBountyRegistry registry) {
         uint256 privateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address verifier = vm.envAddress("RISC0_VERIFIER");
+        address verifier = vm.envAddress("GROTH16_VERIFIER");
 
         vm.startBroadcast(privateKey);
-        registry = new VeilBountyRegistry(IRiscZeroVerifier(verifier));
+        registry = new VeilBountyRegistry(IGroth16Verifier(verifier));
         vm.stopBroadcast();
     }
 }
-

@@ -169,14 +169,14 @@ export default function FlowDiagram() {
             <Leaf x={64} y={420} w={196} h={66} label="GUEST PROGRAM" value="is_broken()" />
 
             {/* zkVM */}
-            <Container x={430} y={252} w={240} h={216} title="RISC Zero zkVM">
-              <Chip x={454} y={282} w={192} h={60} label="RECEIPT" value="journal" hi />
-              <Chip x={454} y={358} w={192} h={60} label="RECEIPT" value="seal" hi />
+            <Container x={430} y={252} w={240} h={216} title="Circom + SnarkJS">
+              <Chip x={454} y={282} w={192} h={60} label="PROOF" value="pi_a / pi_b / pi_c" hi />
+              <Chip x={454} y={358} w={192} h={60} label="SIGNALS" value="fp_hi · fp_lo" hi />
             </Container>
 
             {/* verifier */}
-            <Container x={820} y={252} w={240} h={216} title="Verifier contract">
-              <Chip x={844} y={282} w={192} h={60} label="CHECK" value="image_id ✓" />
+            <Container x={820} y={252} w={240} h={216} title="Groth16Verifier">
+              <Chip x={844} y={282} w={192} h={60} label="CHECK" value="verifyProof ✓" />
               <Chip x={844} y={358} w={192} h={60} label="CHECK" value="victim_id ✓" />
             </Container>
 
