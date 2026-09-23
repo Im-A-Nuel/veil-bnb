@@ -37,7 +37,7 @@ export interface AppState {
   verified: boolean
   balance: number
   claimed: Record<string, boolean>
-  form: { addr: string; imageId: string; title: string; description: string; reward: string; token: Token; stake: string; revealWindow: string; escapeWindow: string; creatorPubkey: string }
+  form: { addr: string; vkHash: string; title: string; description: string; reward: string; token: Token; stake: string; revealWindow: string; escapeWindow: string; creatorPubkey: string }
   toast: string | null
 }
 
@@ -48,7 +48,7 @@ export const BOUNTIES: Bounty[] = [
 
 export const STEPS = [
   'Submitting receipt to contract',
-  'Verifying proof on-chain (RISC Zero)',
+  'Verifying Groth16 proof on-chain',
   'Checking victim binding',
   'Releasing reward',
 ]
@@ -67,7 +67,7 @@ export const INITIAL_STATE: AppState = {
   claimed: {},
   form: {
     addr: '',
-    imageId: '',
+    vkHash: '',
     title: '',
     description: '',
     reward: '',

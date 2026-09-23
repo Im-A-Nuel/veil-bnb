@@ -8,37 +8,9 @@ const MONO  = "var(--font-mono,'JetBrains Mono',monospace)"
 const SERIF = "var(--font-serif,'Instrument Serif',serif)"
 const SANS  = "var(--font-sans,'Inter',sans-serif)"
 
-// Template guest default (logika faktorisasi) — titik awal buat creator edit.
-const DEFAULT_GUEST = `use risc0_zkvm::guest::env;
-use risc0_zkvm::sha::{Impl, Sha256};
-
-fn main() {
-    let a: u128 = env::read();
-    let b: u128 = env::read();
-    let salt: [u8; 32] = env::read();
-    let victim: [u8; 20] = env::read();
-    let bounty_id: u64 = env::read();
-
-    let target: u128 = 1_000_000;
-    assert!(a.checked_mul(b) == Some(target), "a*b != target");
-    assert!(a != 1 && b != 1 && a != target && b != target);
-
-    let mut reveal = [0u8; 96];
-    reveal[16..32].copy_from_slice(&a.to_be_bytes());
-    reveal[48..64].copy_from_slice(&b.to_be_bytes());
-    reveal[64..96].copy_from_slice(&salt);
-    let fingerprint = Impl::hash_bytes(&reveal);
-
-    let mut journal = [0u8; 96];
-    journal[12..32].copy_from_slice(&victim);
-    journal[56..64].copy_from_slice(&bounty_id.to_be_bytes());
-    journal[64..96].copy_from_slice(fingerprint.as_bytes());
-    env::commit_slice(&journal);
-}
-`
 
 interface Props {
-  form: { addr: string; imageId: string; title: string; description: string; reward: string; token: Token; stake: string; revealWindow: string; escapeWindow: string; creatorPubkey: string }
+  form: { addr: string; vkHash: string; title: string; description: string; reward: string; token: Token; stake: string; revealWindow: string; escapeWindow: string; creatorPubkey: string }
   go: (s: Screen) => void
   onAddrChange: (v: string) => void
   onImageChange: (v: string) => void
@@ -58,10 +30,6 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
   const tokenBg  = (t: Token) => form.token === t ? '#1c1c1c' : 'transparent'
   const tokenClr = (t: Token) => form.token === t ? '#EDEDED' : '#8A8A8A'
 
-  const [mode, setMode] = useState<'paste' | 'compile'>('paste')
-  const [src, setSrc] = useState(DEFAULT_GUEST)
-  const [compiling, setCompiling] = useState(false)
-  const [compileMsg, setCompileMsg] = useState<string | null>(null)
   const [aiDesc, setAiDesc] = useState('')
   const [generating, setGenerating] = useState(false)
   const [genMsg, setGenMsg] = useState<string | null>(null)
@@ -69,7 +37,7 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
   const onGenerate = async () => {
     if (!aiDesc.trim()) { setGenMsg('✗ describe the contract first'); return }
     setGenerating(true)
-    setGenMsg('AI is drafting the guest… (a few seconds)')
+    setGenMsg('AI is drafting the circuit description… (a few seconds)')
     try {
       const base = process.env.NEXT_PUBLIC_AGENT_URL?.replace(/\/$/, '')
       const r = await fetch(base ? `${base}/generate-guest` : '/api/generate-guest', {
@@ -79,34 +47,11 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
       })
       const j = await r.json()
       if (!r.ok || j.error) throw new Error(j.error || 'generate failed')
-      setSrc(j.guestSource)
       setGenMsg(`Draft ready for review. ${j.riskSummary || ''}`)
     } catch (e) {
       setGenMsg('✗ ' + (e instanceof Error ? e.message : 'generate failed'))
     } finally {
       setGenerating(false)
-    }
-  }
-
-  const onCompile = async () => {
-    setCompiling(true)
-    setCompileMsg('Compiling on server… (first build can take a few minutes)')
-    try {
-      const base = process.env.NEXT_PUBLIC_AGENT_URL?.replace(/\/$/, '')
-      const url = base ? `${base}/compile-guest` : '/api/compile'
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestSource: src }),
-      })
-      const j = await r.json()
-      if (!r.ok || j.error) throw new Error(j.error || 'compile failed')
-      onImageChange(j.imageId)
-      setCompileMsg('✓ Compiled — ImageID filled below')
-    } catch (e) {
-      setCompileMsg('✗ ' + (e instanceof Error ? e.message : 'compile failed'))
-    } finally {
-      setCompiling(false)
     }
   }
 
@@ -152,64 +97,28 @@ export default function Create({ form, go: _go, onAddrChange, onImageChange, onT
           <div style={{ fontFamily: SANS, fontSize: 11, color: '#5A5A5A', marginTop: 7 }}>stored on-chain — hunters read this to understand the challenge</div>
         </div>
 
-        {/* mode: paste ImageID (compiled locally) vs compile in browser */}
-        <div className="flex gap-2 mb-3">
-          {(['paste', 'compile'] as const).map(m => (
-            <button type="button" key={m} onClick={() => setMode(m)}
-              className="vlink text-[11px] px-3 py-2"
-              style={{ fontFamily: MONO, border: '1px solid #242424', borderRadius: 2, cursor: 'pointer',
-                background: mode === m ? 'rgba(20,184,138,.1)' : 'transparent', color: mode === m ? '#14B88A' : '#8A8A8A' }}>
-              {m === 'paste' ? 'Paste ImageID' : 'Compile locally'}
-            </button>
-          ))}
-        </div>
-
-        {mode === 'compile' && (
-        <div className="mb-5 md:mb-6" style={{ border: '1px solid #242424', borderRadius: 2, padding: 14, background: '#0d0d0d' }}>
-          <label style={{ display: 'block', fontFamily: SANS, fontWeight: 500, fontSize: 13, color: '#EDEDED', marginBottom: 4 }}>
-            Guest logic <span style={{ color: '#14B88A', fontSize: 11 }}>· compile (no install)</span>
-          </label>
-          <div style={{ fontFamily: SANS, fontSize: 11, color: '#5A5A5A', marginBottom: 8 }}>
-            edit the rule that defines a valid exploit — our server compiles it &amp; fills the ImageID
-          </div>
-          <div style={{ border: '1px solid #1f2f29', background: '#0c1411', borderRadius: 2, padding: 10, marginBottom: 10 }}>
-            <div style={{ fontFamily: SANS, fontSize: 12, color: '#14B88A', marginBottom: 6 }}>Draft verification rule with the agent</div>
-            <textarea value={aiDesc} onChange={e => setAiDesc(e.target.value)} rows={3}
-              placeholder="Paste the Solidity source or describe the exact invariant the proof must check."
-              style={{ ...inputSty, fontSize: 12, lineHeight: 1.5, resize: 'vertical' }} />
-            <div className="flex items-center gap-3 mt-2">
-              <button type="button" onClick={onGenerate} disabled={generating}
-                style={{ background: 'transparent', color: '#14B88A', border: '1px solid #14B88A', padding: '8px 14px', fontFamily: SANS, fontWeight: 600, fontSize: 12, borderRadius: 2, cursor: generating ? 'not-allowed' : 'pointer' }}>
-                {generating ? 'Drafting…' : 'Draft guest'}
-              </button>
-              {genMsg && <span style={{ fontFamily: MONO, fontSize: 11, color: genMsg.startsWith('✗') ? '#E06A6A' : '#8A8A8A' }}>{genMsg}</span>}
-            </div>
-            <div style={{ fontFamily: SANS, fontSize: 10, color: '#5A5A5A', marginTop: 6 }}>The agent writes a draft. Compare every assertion with the deployed contract before compiling.</div>
-          </div>
-
-          <textarea
-            value={src}
-            onChange={e => setSrc(e.target.value)}
-            spellCheck={false}
-            rows={12}
-            style={{ ...inputSty, fontSize: 11.5, lineHeight: 1.5, resize: 'vertical', whiteSpace: 'pre', overflowWrap: 'normal', overflowX: 'auto' }}
-          />
+        {/* AI generate circuit description */}
+        <div className="mb-5 md:mb-6" style={{ border: '1px solid #1f2f29', background: '#0c1411', borderRadius: 2, padding: 14 }}>
+          <div style={{ fontFamily: SANS, fontSize: 12, color: '#14B88A', marginBottom: 6 }}>Draft circuit description with the agent</div>
+          <textarea value={aiDesc} onChange={e => setAiDesc(e.target.value)} rows={3}
+            placeholder="Paste the Solidity source or describe the exact invariant the proof must check."
+            style={{ ...inputSty, fontSize: 12, lineHeight: 1.5, resize: 'vertical' }} />
           <div className="flex items-center gap-3 mt-2">
-            <button type="button" onClick={onCompile} disabled={compiling}
-              style={{ background: compiling ? '#5A5A5A' : '#14B88A', color: '#06241B', border: 'none', padding: '9px 16px', fontFamily: SANS, fontWeight: 600, fontSize: 13, borderRadius: 2, cursor: compiling ? 'not-allowed' : 'pointer' }}>
-              {compiling ? 'Compiling…' : 'Compile guest'}
+            <button type="button" onClick={onGenerate} disabled={generating}
+              style={{ background: 'transparent', color: '#14B88A', border: '1px solid #14B88A', padding: '8px 14px', fontFamily: SANS, fontWeight: 600, fontSize: 12, borderRadius: 2, cursor: generating ? 'not-allowed' : 'pointer' }}>
+              {generating ? 'Drafting…' : 'Draft circuit'}
             </button>
-            {compileMsg && <span style={{ fontFamily: MONO, fontSize: 11, color: compileMsg.startsWith('✗') ? '#E06A6A' : '#8A8A8A' }}>{compileMsg}</span>}
+            {genMsg && <span style={{ fontFamily: MONO, fontSize: 11, color: genMsg.startsWith('✗') ? '#E06A6A' : '#8A8A8A' }}>{genMsg}</span>}
           </div>
+          <div style={{ fontFamily: SANS, fontSize: 10, color: '#5A5A5A', marginTop: 6 }}>The agent writes a draft. Review before building and generating the vkHash.</div>
         </div>
-        )}
 
         <div className="mb-5 md:mb-6">
           <label style={{ display: 'block', fontFamily: SANS, fontWeight: 500, fontSize: 13, color: '#EDEDED', marginBottom: 8 }}>
-            Guest ImageID
+            Verification Key Hash (vkHash)
           </label>
-          <input className={inputCls} value={form.imageId} onChange={e => onImageChange(e.target.value)} placeholder="2faaf29c… (64 hex)" style={inputSty} />
-          <div style={{ fontFamily: SANS, fontSize: 11, color: '#5A5A5A', marginTop: 7 }}>hash of the open-source rule that defines a valid exploit</div>
+          <input className={inputCls} value={form.vkHash} onChange={e => onImageChange(e.target.value)} placeholder="0x… (64 hex)" style={inputSty} />
+          <div style={{ fontFamily: SANS, fontSize: 11, color: '#5A5A5A', marginTop: 7 }}>sha256 of the circuit&apos;s verification_key.json — binds hunter to the correct proving circuit</div>
         </div>
 
         <div className="mb-7">

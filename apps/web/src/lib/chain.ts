@@ -36,7 +36,7 @@ const bountyComponents = [
   { name: 'token', type: 'address' },
   { name: 'rewardAmount', type: 'uint256' },
   { name: 'stakeAmount', type: 'uint256' },
-  { name: 'imageId', type: 'bytes32' },
+  { name: 'vkHash', type: 'bytes32' },
   { name: 'creatorPubkey', type: 'bytes32' },
   { name: 'fingerprint', type: 'bytes32' },
   { name: 'hunter', type: 'address' },
@@ -56,7 +56,7 @@ const createComponents = [
   { name: 'token', type: 'address' },
   { name: 'rewardAmount', type: 'uint256' },
   { name: 'stakeAmount', type: 'uint256' },
-  { name: 'imageId', type: 'bytes32' },
+  { name: 'vkHash', type: 'bytes32' },
   { name: 'creatorPubkey', type: 'bytes32' },
   { name: 'revealWindow', type: 'uint64' },
   { name: 'escapeWindow', type: 'uint64' },
@@ -65,11 +65,28 @@ const createComponents = [
   { name: 'description', type: 'string' },
 ] as const
 
+export interface Groth16Proof {
+  pi_a: [string, string]
+  pi_b: [[string, string], [string, string]]
+  pi_c: [string, string]
+  publicSignals: [string, string, string, string, string]
+}
+
 export const registryAbi = [
   { type: 'function', name: 'bountyCount', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'getBounty', stateMutability: 'view', inputs: [{ name: 'bountyId', type: 'uint256' }], outputs: [{ name: 'bounty', type: 'tuple', components: bountyComponents }] },
   { type: 'function', name: 'createBounty', stateMutability: 'payable', inputs: [{ name: 'params', type: 'tuple', components: createComponents }], outputs: [{ name: 'bountyId', type: 'uint256' }] },
-  { type: 'function', name: 'claim', stateMutability: 'payable', inputs: [{ name: 'bountyId', type: 'uint256' }, { name: 'journal', type: 'bytes' }, { name: 'seal', type: 'bytes' }], outputs: [] },
+  {
+    type: 'function', name: 'claim', stateMutability: 'payable',
+    inputs: [
+      { name: 'bountyId', type: 'uint256' },
+      { name: 'pi_a', type: 'uint256[2]' },
+      { name: 'pi_b', type: 'uint256[2][2]' },
+      { name: 'pi_c', type: 'uint256[2]' },
+      { name: 'pubSignals', type: 'uint256[5]' },
+    ],
+    outputs: [],
+  },
   { type: 'function', name: 'confirmReveal', stateMutability: 'nonpayable', inputs: [{ name: 'bountyId', type: 'uint256' }], outputs: [] },
   { type: 'function', name: 'forfeitStake', stateMutability: 'nonpayable', inputs: [{ name: 'bountyId', type: 'uint256' }], outputs: [] },
   { type: 'function', name: 'proveReveal', stateMutability: 'nonpayable', inputs: [{ name: 'bountyId', type: 'uint256' }, { name: 'revealPreimage', type: 'bytes' }], outputs: [] },
@@ -81,7 +98,7 @@ export const registryAbi = [
       { name: 'victim', type: 'address', indexed: true },
       { name: 'token', type: 'address', indexed: false },
       { name: 'rewardAmount', type: 'uint256', indexed: false },
-      { name: 'imageId', type: 'bytes32', indexed: false },
+      { name: 'vkHash', type: 'bytes32', indexed: false },
     ],
   },
 ] as const
@@ -176,7 +193,7 @@ export async function listBounties(): Promise<Bounty[]> {
 export async function createBounty(input: {
   account: Address
   victim: string
-  imageId: string
+  vkHash: string
   creatorPubkey: string
   title: string
   description: string
@@ -204,7 +221,7 @@ export async function createBounty(input: {
       token,
       rewardAmount: reward,
       stakeAmount: stake,
-      imageId: asBytes32(input.imageId, 'ImageID'),
+      vkHash: asBytes32(input.vkHash, 'vkHash'),
       creatorPubkey: b64ToBytes32(input.creatorPubkey),
       revealWindow: BigInt(input.stake && Number(input.stake) > 0 ? input.revealWindow : 0),
       escapeWindow: BigInt(input.stake && Number(input.stake) > 0 ? input.escapeWindow : 0),
@@ -224,16 +241,22 @@ export async function createBounty(input: {
   throw new Error('Bounty transaction succeeded but its creation event was not found.')
 }
 
-export async function claim(bountyId: number, account: Address, journal: Hex, seal: Hex) {
+export async function claim(bountyId: number, account: Address, proof: Groth16Proof) {
   requireRegistry()
   const bounty = await publicClient.readContract({ address: REGISTRY_ADDRESS, abi: registryAbi, functionName: 'getBounty', args: [BigInt(bountyId)] })
   await approveIfNeeded(bounty.token, account, bounty.stakeAmount)
   const client = await walletClient(account)
+
+  const pi_a = proof.pi_a.map(BigInt) as [bigint, bigint]
+  const pi_b = proof.pi_b.map(row => row.map(BigInt)) as [[bigint, bigint], [bigint, bigint]]
+  const pi_c = proof.pi_c.map(BigInt) as [bigint, bigint]
+  const pubSignals = proof.publicSignals.map(BigInt) as [bigint, bigint, bigint, bigint, bigint]
+
   const hash = await client.writeContract({
     address: REGISTRY_ADDRESS,
     abi: registryAbi,
     functionName: 'claim',
-    args: [BigInt(bountyId), journal, seal],
+    args: [BigInt(bountyId), pi_a, pi_b, pi_c, pubSignals],
     value: bounty.token === zeroAddress ? bounty.stakeAmount : BigInt(0),
   })
   await publicClient.waitForTransactionReceipt({ hash })

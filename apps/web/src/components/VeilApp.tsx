@@ -16,9 +16,8 @@ import IntroOverlay from './IntroOverlay'
 import WalletModal from './WalletModal'
 import { useWallet } from '@/hooks/useWallet'
 import { shortAddr } from '@/lib/wallet'
-import { CONTRACTS_CONFIGURED, claim, listBounties, createBounty, confirmReveal, forfeitStake, proveReveal, asHex } from '@/lib/chain'
+import { CONTRACTS_CONFIGURED, claim, listBounties, createBounty, confirmReveal, forfeitStake, proveReveal, type Groth16Proof } from '@/lib/chain'
 import type { Reveal } from '@/lib/reveal'
-import type { Hex } from 'viem'
 
 export default function VeilApp() {
   const [s, setS] = useState<AppState>(INITIAL_STATE)
@@ -27,7 +26,7 @@ export default function VeilApp() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-  const proofRef = useRef<{ journal: Hex; seal: Hex } | null>(null)
+  const proofRef = useRef<Groth16Proof | null>(null)
   const wallet = useWallet()
   const connected = wallet.status === 'connected'
   const [chainBounties, setChainBounties] = useState<Bounty[] | null>(null)
@@ -121,13 +120,19 @@ export default function VeilApp() {
     setS(prev => ({ ...prev, fileLoaded: true, fileName: name || 'proof.json', dragging: false }))
   }
 
-  // capture proof.json { journal, seal } (hex) → bytes, untuk claim on-chain
+  // capture proof.json { pi_a, pi_b, pi_c, publicSignals } (Groth16) → untuk claim on-chain
   const captureFile = async (file?: File) => {
     if (!file) { proofRef.current = null; loadFile('proof.json'); return }
     try {
       const txt = await file.text()
       const j = JSON.parse(txt)
-      proofRef.current = { journal: asHex(j.journal), seal: asHex(j.seal) }
+      if (!j.pi_a || !j.pi_b || !j.pi_c || !j.publicSignals) throw new Error('invalid')
+      proofRef.current = {
+        pi_a: j.pi_a.slice(0, 2) as [string, string],
+        pi_b: [j.pi_b[0].slice(0, 2), j.pi_b[1].slice(0, 2)] as [[string, string], [string, string]],
+        pi_c: j.pi_c.slice(0, 2) as [string, string],
+        publicSignals: j.publicSignals.slice(0, 5) as [string, string, string, string, string],
+      }
     } catch {
       proofRef.current = null
     }
@@ -149,9 +154,7 @@ export default function VeilApp() {
     setS(prev => ({ ...prev, screen: 'verify', verifyStep: 1, verified: false }))
     try { window.scrollTo(0, 0) } catch (_) {}
     try {
-      // bounty_id = id asli on-chain; kirim journal + seal dari proof.json.
-      const { journal, seal } = proofRef.current!
-      const hash = await claim(Number(activeId), addr, journal, seal)
+      const hash = await claim(Number(activeId), addr, proofRef.current!)
       setClaimTx(hash)
       setS(st => ({ ...st, verifyStep: STEPS.length, verified: true, claimed: { ...st.claimed, [activeId]: true } }))
       wallet.refreshBalance()
@@ -171,8 +174,8 @@ export default function VeilApp() {
 
   const submitCreate = async () => {
     const f = s.form
-    if (!f.addr || !f.imageId || !f.reward || !f.description) {
-      showToast('Fill all fields (contract, ImageID, description, reward)'); return
+    if (!f.addr || !f.vkHash || !f.reward || !f.description) {
+      showToast('Fill all fields (contract, vkHash, description, reward)'); return
     }
     if (!f.creatorPubkey) {
       showToast('Generate a reveal key first (so hunters can send you the exploit)', 4500); return
@@ -191,7 +194,7 @@ export default function VeilApp() {
       const { bountyId } = await createBounty({
         account: addr,
         victim: f.addr,
-        imageId: f.imageId,
+        vkHash: f.vkHash,
         creatorPubkey: f.creatorPubkey,
         title: f.title || 'ZK Bounty',
         description: f.description,
@@ -379,7 +382,7 @@ export default function VeilApp() {
               form={s.form}
               go={go}
               onAddrChange={(v: string) => setS(prev => ({ ...prev, form: { ...prev.form, addr: v } }))}
-              onImageChange={(v: string) => setS(prev => ({ ...prev, form: { ...prev.form, imageId: v } }))}
+              onImageChange={(v: string) => setS(prev => ({ ...prev, form: { ...prev.form, vkHash: v } }))}
               onTitleChange={(v: string) => setS(prev => ({ ...prev, form: { ...prev.form, title: v } }))}
               onDescChange={(v: string) => setS(prev => ({ ...prev, form: { ...prev.form, description: v } }))}
               onRewardChange={(v: string) => setS(prev => ({ ...prev, form: { ...prev.form, reward: v } }))}
