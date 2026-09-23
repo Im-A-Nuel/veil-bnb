@@ -19,7 +19,7 @@
  */
 
 import { execSync } from 'child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs'
 import { createWriteStream } from 'fs'
 import { get } from 'https'
 import path from 'path'
@@ -59,7 +59,7 @@ function download(url, dest) {
       if (res.statusCode === 301 || res.statusCode === 302) {
         file.close()
         // Remove the incomplete file before re-attempting
-        try { import('fs').then(fs => fs.unlinkSync(dest)) } catch (_) {}
+        try { unlinkSync(dest) } catch (_) {}
         download(res.headers.location, dest).then(resolve).catch(reject)
         return
       }
