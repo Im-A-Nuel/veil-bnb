@@ -23,3 +23,10 @@ zk/proof.json
 zk/reveal.json
 zk/journal.hex
 zk/seal.bin
+*.ptau
+*.zkey
+zk/circuits/*.r1cs
+zk/circuits/*.sym
+zk/circuits/*.wasm
+zk/circuits/*_js/
+zk/verification_key.json
