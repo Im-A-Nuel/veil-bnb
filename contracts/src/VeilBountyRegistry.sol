@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { IERC20 } from "./interfaces/IERC20.sol";
-import { IRiscZeroVerifier } from "./interfaces/IRiscZeroVerifier.sol";
+import { IGroth16Verifier } from "./interfaces/IGroth16Verifier.sol";
 import { SafeTransferLib } from "./libraries/SafeTransferLib.sol";
 
 /// @title VeilBountyRegistry
@@ -21,7 +21,7 @@ contract VeilBountyRegistry {
         address token;
         uint256 rewardAmount;
         uint256 stakeAmount;
-        bytes32 imageId;
+        bytes32 vkHash;
         bytes32 creatorPubkey;
         uint64 revealWindow;
         uint64 escapeWindow;
@@ -36,7 +36,7 @@ contract VeilBountyRegistry {
         address token;
         uint256 rewardAmount;
         uint256 stakeAmount;
-        bytes32 imageId;
+        bytes32 vkHash;
         bytes32 creatorPubkey;
         bytes32 fingerprint;
         address hunter;
@@ -80,7 +80,7 @@ contract VeilBountyRegistry {
         address indexed victim,
         address token,
         uint256 rewardAmount,
-        bytes32 imageId
+        bytes32 vkHash
     );
     event BountyFunded(uint256 indexed bountyId, address indexed funder, uint256 amount);
     event BountyClaimed(
@@ -91,7 +91,7 @@ contract VeilBountyRegistry {
     event StakeForfeited(uint256 indexed bountyId, address indexed creator, uint256 amount);
     event BountyRefunded(uint256 indexed bountyId, address indexed creator, uint256 amount);
 
-    IRiscZeroVerifier public immutable verifier;
+    IGroth16Verifier public immutable verifier;
     uint256 public bountyCount;
 
     mapping(uint256 bountyId => Bounty) private bounties;
@@ -104,7 +104,7 @@ contract VeilBountyRegistry {
         unlocked = 1;
     }
 
-    constructor(IRiscZeroVerifier verifier_) {
+    constructor(IGroth16Verifier verifier_) {
         if (address(verifier_) == address(0)) revert InvalidVerifier();
         verifier = verifier_;
     }
@@ -126,7 +126,7 @@ contract VeilBountyRegistry {
         bounty.token = params.token;
         bounty.rewardAmount = params.rewardAmount;
         bounty.stakeAmount = params.stakeAmount;
-        bounty.imageId = params.imageId;
+        bounty.vkHash = params.vkHash;
         bounty.creatorPubkey = params.creatorPubkey;
         bounty.revealWindow = params.revealWindow;
         bounty.escapeWindow = params.escapeWindow;
@@ -135,7 +135,7 @@ contract VeilBountyRegistry {
         bounty.description = params.description;
 
         emit BountyCreated(
-            bountyId, msg.sender, params.victim, params.token, params.rewardAmount, params.imageId
+            bountyId, msg.sender, params.victim, params.token, params.rewardAmount, params.vkHash
         );
     }
 
@@ -150,25 +150,28 @@ contract VeilBountyRegistry {
         emit BountyFunded(bountyId, msg.sender, amount);
     }
 
-    /// @notice Verifies an EVM-encoded RISC Zero journal and releases the bounty.
-    /// @dev journal = abi.encode(victim address, bounty id, reveal fingerprint).
-    function claim(uint256 bountyId, bytes calldata journal, bytes calldata seal)
-        external
-        payable
-        nonReentrant
-    {
+    /// @notice Verifies a Groth16 proof and releases the bounty reward.
+    /// @dev publicSignals: [fingerprint_hi, fingerprint_lo, victim_as_uint, bountyId, target]
+    function claim(
+        uint256 bountyId,
+        uint[2] calldata pi_a,
+        uint[2][2] calldata pi_b,
+        uint[2] calldata pi_c,
+        uint[5] calldata pubSignals
+    ) external payable nonReentrant {
         Bounty storage bounty = _getBounty(bountyId);
         if (bounty.status != Status.Open) revert BountyNotOpen();
         if (_isExpired(bounty)) revert BountyExpired();
-        if (journal.length != 96) revert InvalidJournal();
 
-        (address boundVictim, uint256 boundBountyId, bytes32 fingerprint) =
-            abi.decode(journal, (address, uint256, bytes32));
-        if (boundVictim != bounty.victim || boundBountyId != bountyId || fingerprint == bytes32(0)) {
-            revert InvalidJournal();
-        }
+        address boundVictim = address(uint160(pubSignals[2]));
+        uint256 boundBountyId = pubSignals[3];
+        if (boundVictim != bounty.victim || boundBountyId != bountyId) revert InvalidJournal();
 
-        verifier.verify(seal, bounty.imageId, sha256(journal));
+        bytes32 fingerprint = bytes32((pubSignals[0] << 128) | pubSignals[1]);
+        if (fingerprint == bytes32(0)) revert InvalidJournal();
+
+        if (!verifier.verifyProof(pi_a, pi_b, pi_c, pubSignals)) revert InvalidJournal();
+
         _takeAsset(bounty.token, msg.sender, bounty.stakeAmount, msg.value);
 
         uint256 reward = bounty.rewardAmount;
@@ -241,7 +244,7 @@ contract VeilBountyRegistry {
 
     function _validateCreate(CreateParams calldata params) private view {
         if (params.victim == address(0)) revert InvalidVictim();
-        if (params.imageId == bytes32(0)) revert InvalidImageId();
+        if (params.vkHash == bytes32(0)) revert InvalidImageId();
         if (params.rewardAmount == 0) revert InvalidReward();
         if (bytes(params.title).length == 0 || bytes(params.title).length > 96) revert EmptyTitle();
         if (bytes(params.description).length > 1_024) revert EmptyTitle();
