@@ -19,7 +19,7 @@
  */
 
 import { execSync } from 'child_process'
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs'
 import { createWriteStream } from 'fs'
 import { get } from 'https'
 import path from 'path'
@@ -192,8 +192,13 @@ async function main() {
   console.log(`  verification_key.json written: ${VK_PATH}`)
 
   // 5b. Groth16 Solidity verifier
-  //     snarkjs 0.7.x: exportSolidityVerifier(zkeyPath) → Promise<string>
-  const verifierCode = await snarkjs.zKey.exportSolidityVerifier(ZKEY_FINAL)
+  //     snarkjs 0.7.x: exportSolidityVerifier(zkeyPath, templates) → Promise<string>
+  //     templates must be loaded explicitly, keyed by protocol name.
+  const groth16Template = readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.resolve('snarkjs'))), 'templates', 'verifier_groth16.sol.ejs'),
+    'utf8',
+  )
+  const verifierCode = await snarkjs.zKey.exportSolidityVerifier(ZKEY_FINAL, { groth16: groth16Template })
 
   // Ensure contracts/src directory exists before writing
   if (!existsSync(CONTRACTS_SRC)) mkdirSync(CONTRACTS_SRC, { recursive: true })
