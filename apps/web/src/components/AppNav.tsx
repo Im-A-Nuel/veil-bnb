@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import { Screen } from '@/lib/data'
 import { shortAddr } from '@/lib/wallet'
 
@@ -22,6 +23,25 @@ interface Props {
 export default function AppNav({ go, huntActive, createActive, balanceStr, connected, connecting, address, onConnect, onDisconnect, onSwitch }: Props) {
   const tabBg  = (on: boolean) => on ? '#1c1c1c' : 'transparent'
   const tabClr = (on: boolean) => on ? '#EDEDED' : '#8A8A8A'
+
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('mousedown', onDocClick)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
+  const copyAddress = () => { if (address) { try { navigator.clipboard.writeText(address) } catch {} } }
 
   return (
     <div className="flex items-center justify-between px-5 md:px-10 py-[14px] md:py-[18px]"
@@ -55,28 +75,49 @@ export default function AppNav({ go, huntActive, createActive, balanceStr, conne
 
       {/* wallet badge / connect */}
       {connected ? (
-        <div className="vbtn group flex items-center gap-2 md:gap-[9px] px-3 md:px-[14px] py-2 md:py-[8px]"
-          style={{ border: '1px solid #242424', borderRadius: 2, background: 'transparent' }}
-        >
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#14B88A', display: 'inline-block', boxShadow: '0 0 0 3px rgba(20,184,138,.12)' }} />
-          <button onClick={onSwitch} title="Switch account" aria-label="Switch account"
-            className="vlink hidden sm:inline"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: MONO, fontSize: 12, color: '#EDEDED', letterSpacing: '.02em', padding: 0 }}
-          >{address ? shortAddr(address) : '—'}</button>
-          <span className="hidden sm:inline" style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A5A' }}>·</span>
-          <span style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A' }}>{balanceStr} BNB</span>
-          <span style={{ width: 1, height: 14, background: '#242424', display: 'inline-block', margin: '0 2px' }} />
-          <button onClick={onDisconnect} title="Disconnect wallet" aria-label="Disconnect wallet"
-            className="vlink flex items-center"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#14B88A', padding: 0, lineHeight: 0 }}
+        <div ref={menuRef} style={{ position: 'relative' }}>
+          <button type="button" onClick={() => setMenuOpen(v => !v)}
+            aria-haspopup="true" aria-expanded={menuOpen}
+            className="vbtn group flex items-center gap-2 md:gap-[9px] px-3 md:px-[14px] py-2 md:py-[8px]"
+            style={{ border: '1px solid #242424', borderRadius: 2, background: 'transparent', cursor: 'pointer' }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 17H7A5 5 0 0 1 7 7" />
-              <path d="M15 7h2a5 5 0 0 1 4 7.54" />
-              <line x1="8" y1="12" x2="12" y2="12" />
-              <line x1="2" y1="2" x2="22" y2="22" />
-            </svg>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#14B88A', display: 'inline-block', boxShadow: '0 0 0 3px rgba(20,184,138,.12)' }} />
+            <span className="hidden sm:inline" style={{ fontFamily: MONO, fontSize: 12, color: '#EDEDED', letterSpacing: '.02em' }}>{address ? shortAddr(address) : '—'}</span>
+            <span className="hidden sm:inline" style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A5A' }}>·</span>
+            <span style={{ fontFamily: MONO, fontSize: 12, color: '#8A8A8A' }}>{balanceStr} BNB</span>
           </button>
+
+          {menuOpen && (
+            <div role="menu" className="screen-enter"
+              style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 220,
+                background: '#0E0E0E', border: '1px solid #242424', borderRadius: 4,
+                boxShadow: '0 20px 50px -20px rgba(0,0,0,.85)', overflow: 'hidden', zIndex: 30,
+              }}
+            >
+              <div className="px-4 py-3" style={{ borderBottom: '1px solid #1c1c1c' }}>
+                <div style={{ fontFamily: MONO, fontSize: 10, color: '#5A5A5A', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>Address</div>
+                <div className="flex items-center justify-between gap-2">
+                  <span style={{ fontFamily: MONO, fontSize: 13, color: '#EDEDED' }}>{address ? shortAddr(address) : '—'}</span>
+                  <button type="button" onClick={copyAddress} title="Copy address" aria-label="Copy address" className="vlink"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#14B88A', fontFamily: MONO, fontSize: 11 }}
+                  >copy</button>
+                </div>
+              </div>
+              <div className="px-4 py-3" style={{ borderBottom: '1px solid #1c1c1c' }}>
+                <div style={{ fontFamily: MONO, fontSize: 10, color: '#5A5A5A', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>Balance</div>
+                <div style={{ fontFamily: MONO, fontSize: 13, color: '#EDEDED' }}>{balanceStr} BNB</div>
+              </div>
+              <button type="button" onClick={() => { setMenuOpen(false); onSwitch() }}
+                className="vlink" role="menuitem"
+                style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', padding: '11px 16px', fontFamily: SANS, fontSize: 13, color: '#EDEDED' }}
+              >Switch account</button>
+              <button type="button" onClick={() => { setMenuOpen(false); onDisconnect() }}
+                className="vlink" role="menuitem"
+                style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', padding: '11px 16px', fontFamily: SANS, fontSize: 13, color: '#E06A6A', borderTop: '1px solid #1c1c1c' }}
+              >Disconnect wallet</button>
+            </div>
+          )}
         </div>
       ) : (
         <button onClick={onConnect} disabled={connecting}

@@ -24,6 +24,18 @@ type EthereumWindow = Window & typeof globalThis & { ethereum?: EIP1193Provider 
 const providers = new Map<string, EIP1193Provider>()
 let activeProvider: EIP1193Provider | null = null
 
+// Remembers an explicit disconnect so a reload does not silently re-attach the wallet.
+const DISCONNECTED_KEY = 'veil:wallet-disconnected'
+function setDisconnectedFlag(on: boolean) {
+  try {
+    if (on) localStorage.setItem(DISCONNECTED_KEY, '1')
+    else localStorage.removeItem(DISCONNECTED_KEY)
+  } catch { /* storage unavailable */ }
+}
+function isDisconnectedFlag() {
+  try { return localStorage.getItem(DISCONNECTED_KEY) === '1' } catch { return false }
+}
+
 const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || '97')
 const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'https://bsc-testnet-dataseed.bnbchain.org'
 const explorerUrl = process.env.NEXT_PUBLIC_EXPLORER_URL || 'https://testnet.bscscan.com'
@@ -111,6 +123,7 @@ export async function connectWith(id: string): Promise<WalletInfo> {
   const address = accounts?.[0] as `0x${string}` | undefined
   if (!address) throw new Error('The wallet did not return an account.')
   activeProvider = provider
+  setDisconnectedFlag(false)
   return { address, network: chainName(chainId), chainId }
 }
 
@@ -122,6 +135,7 @@ export async function connect(): Promise<WalletInfo> {
 }
 
 export async function getConnected(): Promise<WalletInfo | null> {
+  if (isDisconnectedFlag()) return null
   const wallets = await listWallets()
   for (const wallet of wallets.filter((item) => item.isAvailable)) {
     const provider = providers.get(wallet.id)
@@ -148,6 +162,28 @@ export async function getActiveProvider(): Promise<EIP1193Provider> {
 
 export function disconnectWallet() {
   activeProvider = null
+  setDisconnectedFlag(true)
+}
+
+/** Subscribes to account/chain changes on the active wallet. Returns an unsubscribe function. */
+export function watchActiveWallet(handlers: {
+  onAccounts: (accounts: string[]) => void
+  onChain: (chainId: number) => void
+}): () => void {
+  const provider = activeProvider
+  if (!provider?.on) return () => {}
+  const accounts = (a: unknown) => handlers.onAccounts(Array.isArray(a) ? (a as string[]) : [])
+  const chain = (id: unknown) => handlers.onChain(Number(id))
+  provider.on('accountsChanged', accounts)
+  provider.on('chainChanged', chain)
+  return () => {
+    provider.removeListener?.('accountsChanged', accounts)
+    provider.removeListener?.('chainChanged', chain)
+  }
+}
+
+export function chainLabel(id: number) {
+  return chainName(id)
 }
 
 export function shortAddr(address: string) {

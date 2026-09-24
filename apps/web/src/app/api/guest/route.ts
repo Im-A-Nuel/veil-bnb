@@ -11,7 +11,9 @@ export async function GET() {
     const buf = await new Promise<Buffer>((resolve, reject) => {
       execFile(
         'tar',
-        ['-czf', '-', '-C', repoRoot, '--exclude=zk/target', '--exclude=zk/proof.json',
+        ['-czf', '-', '-C', repoRoot,
+         '--exclude=zk/target', '--exclude=zk/node_modules',
+         '--exclude=zk/proof.json', '--exclude=zk/reveal.json', '--exclude=*.ptau',
          '--exclude=zk/seal.bin', '--exclude=zk/journal.hex', 'zk'],
         { encoding: 'buffer', maxBuffer: 1 << 26 },
         (err, stdout) => (err ? reject(err) : resolve(stdout as Buffer)),
@@ -23,7 +25,7 @@ export async function GET() {
         'Content-Disposition': 'attachment; filename="veil-prover-project.tar.gz"',
       },
     })
-  } catch (e) {
-    return new Response('Could not package the prover project: ' + (e instanceof Error ? e.message : ''), { status: 500 })
+  } catch {
+    return new Response('Could not package the prover project.', { status: 500 })
   }
 }

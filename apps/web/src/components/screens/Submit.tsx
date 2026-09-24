@@ -6,6 +6,7 @@ import { explorerAddressUrl } from '@/lib/chain'
 const MONO  = "var(--font-mono,'JetBrains Mono',monospace)"
 const SERIF = "var(--font-serif,'Instrument Serif',serif)"
 const SANS  = "var(--font-sans,'Inter',sans-serif)"
+const REPO_URL = 'https://github.com/Im-A-Nuel/veil-bnb'
 
 interface Props {
   bounty: Bounty
@@ -63,15 +64,15 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
 
           <div style={{ fontFamily: MONO, fontSize: 10, color: '#5A5A5A', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 12 }}>How to claim</div>
           <ol style={{ margin: 0, paddingLeft: 18, fontFamily: SANS, fontSize: 13.5, color: '#BDBDBD', lineHeight: 1.7 }}>
-            <li>Read the rule (guest) — it defines what counts as a valid exploit.</li>
-            <li>Poke the victim contract above → find the secret input that breaks it.</li>
+            <li>Read the circuit — it defines what counts as a valid exploit.</li>
+            <li>Study the victim contract above and find the secret input that breaks it.</li>
             <li>Generate the proof <b style={{ color: '#EDEDED' }}>on your own machine</b> (your secret never leaves):
-              <div style={{ marginTop: 6, fontFamily: MONO, fontSize: 12, color: '#8A8A8A' }}>
-                • have toolchain → <a href="/api/guest" download style={{ color: '#14B88A' }}>download project</a> → extract → <code style={{ color: '#CDCDCD' }}>cargo run --release --bin host -- &lt;a&gt; &lt;b&gt; &lt;victim-address&gt; &lt;bounty-id&gt;</code><br />
-                • no toolchain → <a href="/api/prover" download style={{ color: '#14B88A' }}>download prover</a> (needs Docker)
+              <div style={{ marginTop: 6, fontFamily: MONO, fontSize: 12, color: '#8A8A8A', overflowWrap: 'anywhere' }}>
+                <a href={REPO_URL} target="_blank" rel="noreferrer" style={{ color: '#14B88A' }}>clone the repo</a> → <code style={{ color: '#CDCDCD' }}>cd zk &amp;&amp; npm install</code> →{' '}
+                <code style={{ color: '#CDCDCD' }}>node scripts/prove.mjs &lt;a&gt; &lt;b&gt; {bounty.victimFull ?? '<victim-address>'} {bounty.id}</code>
               </div>
             </li>
-            <li>It writes <code style={{ color: '#EDEDED' }}>proof.json</code> → drop it below → claim.</li>
+            <li>It writes <code style={{ color: '#EDEDED' }}>proof.json</code> (public) and <code style={{ color: '#EDEDED' }}>reveal.json</code> (keep private). Drop <code style={{ color: '#EDEDED' }}>proof.json</code> below and claim.</li>
           </ol>
         </div>
 
@@ -94,9 +95,9 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
             <div style={{ border: '1px solid #242424', background: '#161616', padding: '22px 24px', borderRadius: 2 }}>
               <div className="flex items-center gap-2 mb-4">
                 <span style={{ fontSize: 14, color: '#8A8A8A' }}>◳</span>
-                <span style={{ fontFamily: MONO, fontSize: 10, color: '#8A8A8A', letterSpacing: '.12em' }}>RECEIPT (PUBLIC)</span>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: '#8A8A8A', letterSpacing: '.12em' }}>PROOF (PUBLIC)</span>
               </div>
-              <div style={{ fontFamily: MONO, fontWeight: 600, fontSize: 19, color: '#EDEDED', marginBottom: 6 }}>journal + seal</div>
+              <div style={{ fontFamily: MONO, fontWeight: 600, fontSize: 19, color: '#EDEDED', marginBottom: 6 }}>proof + public signals</div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A' }}>this is what gets uploaded</div>
             </div>
           </div>
@@ -115,9 +116,9 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
             <div style={{ border: '1px solid #242424', background: '#161616', padding: '18px', borderRadius: 2 }}>
               <div className="flex items-center gap-2 mb-3">
                 <span style={{ color: '#8A8A8A' }}>◳</span>
-                <span style={{ fontFamily: MONO, fontSize: 9, color: '#8A8A8A', letterSpacing: '.12em' }}>RECEIPT (PUBLIC)</span>
+                <span style={{ fontFamily: MONO, fontSize: 9, color: '#8A8A8A', letterSpacing: '.12em' }}>PROOF (PUBLIC)</span>
               </div>
-              <div style={{ fontFamily: MONO, fontWeight: 600, fontSize: 16, color: '#EDEDED', marginBottom: 5 }}>journal + seal</div>
+              <div style={{ fontFamily: MONO, fontWeight: 600, fontSize: 16, color: '#EDEDED', marginBottom: 5 }}>proof + public signals</div>
               <div style={{ fontFamily: MONO, fontSize: 10, color: '#8A8A8A' }}>this is what gets uploaded</div>
             </div>
           </div>
@@ -144,7 +145,7 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
                 <span style={{ fontSize: 16, color: '#14B88A' }}>◳</span>
                 <div>
                   <div style={{ fontFamily: MONO, fontSize: 13, color: '#EDEDED' }}>{fileName}</div>
-                  <div style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A' }}>2.4 MB · loaded locally</div>
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A' }}>validated · loaded locally</div>
                 </div>
               </div>
               <button type="button" onClick={onPickFile} className="vlink" style={{ fontFamily: MONO, fontSize: 11, color: '#8A8A8A', cursor: 'pointer', textDecoration: 'underline', background: 'transparent', border: 0 }}>replace</button>
@@ -158,9 +159,9 @@ export default function Submit({ bounty, fileLoaded, fileName, dragging, go, onP
           <div style={{ fontFamily: MONO, fontSize: 10, color: '#5A5A5A', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 14 }}>The contract will check</div>
           <div className="flex flex-col gap-2 md:gap-3">
             {[
-              ['proof valid against ', 'image_id'],
-              ['journal binds to ', 'victim_id'],
-              ['bounty not yet claimed', null],
+              ['Groth16 proof valid against ', 'verification key'],
+              ['public signals bind to ', 'bounty id + victim'],
+              ['bounty still open', null],
             ].map(([prefix, code]) => (
               <div key={String(prefix)} className="flex items-center gap-2 md:gap-3"
                 style={{ fontFamily: MONO, fontSize: 13, color: '#8A8A8A' }}

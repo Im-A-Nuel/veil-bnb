@@ -3,6 +3,9 @@ export const maxDuration = 100
 
 export async function POST(request: Request) {
   const agentUrl = (process.env.AGENT_URL || 'http://127.0.0.1:3001').replace(/\/$/, '')
+  if (Number(request.headers.get('content-length') || 0) > 40_000) {
+    return Response.json({ error: 'Request body is too large.' }, { status: 413 })
+  }
   let body: unknown
   try {
     body = await request.json()

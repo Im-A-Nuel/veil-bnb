@@ -27,7 +27,7 @@ export function generateKeypair(): { publicKey: string; secretKey: string } {
 /** Hunter enkripsi pesan ke public key creator → satu string base64 (eph|nonce|cipher). */
 export function encryptForCreator(message: string, creatorPubB64: string): string {
   const creatorPub = fromB64(creatorPubB64)
-  if (creatorPub.length !== 32) throw new Error('public key creator tidak valid')
+  if (creatorPub.length !== 32) throw new Error('Creator public key is invalid.')
   const eph = nacl.box.keyPair()
   const nonce = nacl.randomBytes(nacl.box.nonceLength)
   const cipher = nacl.box(enc(message), nonce, creatorPub, eph.secretKey)
@@ -42,12 +42,13 @@ export function encryptForCreator(message: string, creatorPubB64: string): strin
 export function decryptAsCreator(packedB64: string, secretB64: string): string {
   const packed = fromB64(packedB64)
   const secret = fromB64(secretB64)
-  if (secret.length !== 32) throw new Error('private key tidak valid')
+  if (secret.length !== 32) throw new Error('Private key is invalid.')
+  if (packed.length <= 32 + nacl.box.nonceLength) throw new Error('Ciphertext is too short or corrupted.')
   const ephPub = packed.slice(0, 32)
   const nonce = packed.slice(32, 32 + nacl.box.nonceLength)
   const cipher = packed.slice(32 + nacl.box.nonceLength)
   const msg = nacl.box.open(cipher, nonce, ephPub, secret)
-  if (!msg) throw new Error('dekripsi gagal — kunci salah / ciphertext rusak')
+  if (!msg) throw new Error('Decryption failed: wrong key or corrupted ciphertext.')
   return dec(msg)
 }
 
@@ -69,14 +70,14 @@ const hexToBytes = (h: string) => {
 }
 /** uint256 → 32-byte big-endian word, matching Solidity ABI encoding. */
 function u256ToBE32(n: bigint): Uint8Array {
-  if (n < BigInt(0)) throw new Error('nilai reveal tidak boleh negatif')
+  if (n < BigInt(0)) throw new Error('Reveal values must not be negative.')
   const out = new Uint8Array(32)
   let v = n
   for (let i = 31; i >= 0; i--) {
     out[i] = Number(v & BigInt(255))
     v >>= BigInt(8)
   }
-  if (v !== BigInt(0)) throw new Error('nilai reveal melebihi uint256')
+  if (v !== BigInt(0)) throw new Error('Reveal value exceeds uint256.')
   return out
 }
 
@@ -88,9 +89,15 @@ export interface Reveal {
 
 /** Parse string hasil dekripsi (isi reveal.json) → {a,b,salt}. */
 export function parseReveal(text: string): Reveal {
-  const o = JSON.parse(text)
-  if (o.a == null || o.b == null || !o.salt) throw new Error('format reveal tidak valid (butuh a, b, salt)')
-  return { a: String(o.a), b: String(o.b), salt: String(o.salt) }
+  let o: { a?: unknown; b?: unknown; salt?: unknown }
+  try { o = JSON.parse(text) } catch { throw new Error('Reveal is not valid JSON.') }
+  const a = String(o?.a ?? '')
+  const b = String(o?.b ?? '')
+  const salt = String(o?.salt ?? '')
+  if (!/^\d+$/.test(a) || !/^\d+$/.test(b) || !/^(0x)?[0-9a-fA-F]{64}$/.test(salt)) {
+    throw new Error('Reveal must contain numeric a, b and a 32-byte hex salt.')
+  }
+  return { a, b, salt: salt.startsWith('0x') ? salt : `0x${salt}` }
 }
 
 /** Hitung sidik jari SHA-256 atas ABI preimage 96 byte. */
@@ -99,7 +106,7 @@ export async function fingerprintFromReveal(r: Reveal): Promise<string> {
   data.set(u256ToBE32(BigInt(r.a)), 0)
   data.set(u256ToBE32(BigInt(r.b)), 32)
   const salt = hexToBytes(r.salt)
-  if (salt.length !== 32) throw new Error('salt harus 32 byte')
+  if (salt.length !== 32) throw new Error('Salt must be 32 bytes.')
   data.set(salt, 64)
   const digest = await crypto.subtle.digest('SHA-256', data)
   return toHex(new Uint8Array(digest))

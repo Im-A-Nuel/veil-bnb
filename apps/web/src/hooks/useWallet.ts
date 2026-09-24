@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { connect as libConnect, connectWith as libConnectWith, getConnected, disconnectWallet, type WalletInfo } from '@/lib/wallet'
+import { connect as libConnect, connectWith as libConnectWith, getConnected, disconnectWallet, watchActiveWallet, chainLabel, type WalletInfo } from '@/lib/wallet'
 import { getNativeBalance } from '@/lib/chain'
+import { friendlyError } from '@/lib/errors'
 
 export type WalletStatus = 'idle' | 'connecting' | 'connected'
 
@@ -26,8 +27,10 @@ export function useWallet(): UseWallet {
   const mounted = useRef(true)
 
   const loadBalance = useCallback(async (addr: `0x${string}`) => {
-    const bal = await getNativeBalance(addr)
-    if (mounted.current) setBalance(bal)
+    try {
+      const bal = await getNativeBalance(addr)
+      if (mounted.current) setBalance(bal)
+    } catch { /* keep last known balance; RPC may be briefly unavailable */ }
   }, [])
 
   // re-attach on mount if the site is already authorised
@@ -38,9 +41,32 @@ export function useWallet(): UseWallet {
       setInfo(w)
       setStatus('connected')
       loadBalance(w.address)
-    })
+    }).catch(() => { /* wallet locked or unavailable: stay disconnected */ })
     return () => { mounted.current = false }
   }, [loadBalance])
+
+  // keep UI in sync when the user switches account/network inside the wallet
+  const connected = status === 'connected'
+  useEffect(() => {
+    if (!connected) return
+    return watchActiveWallet({
+      onAccounts: (accounts) => {
+        const next = accounts[0] as `0x${string}` | undefined
+        if (!next) {
+          disconnectWallet()
+          setInfo(null)
+          setStatus('idle')
+          setBalance(0)
+          return
+        }
+        setInfo((prev) => (prev ? { ...prev, address: next } : prev))
+        loadBalance(next)
+      },
+      onChain: (id) => {
+        setInfo((prev) => (prev ? { ...prev, chainId: id, network: chainLabel(id) } : prev))
+      },
+    })
+  }, [connected, loadBalance])
 
   const connectWith = useCallback(async (id: string) => {
     setError(null)
@@ -56,7 +82,7 @@ export function useWallet(): UseWallet {
     } catch (e) {
       if (mounted.current) {
         setStatus('idle')
-        setError(e instanceof Error ? e.message : 'Failed to connect wallet.')
+        setError(friendlyError(e, 'Failed to connect wallet.'))
       }
       throw e
     }
@@ -76,7 +102,7 @@ export function useWallet(): UseWallet {
     } catch (e) {
       if (mounted.current) {
         setStatus('idle')
-        setError(e instanceof Error ? e.message : 'Failed to connect wallet.')
+        setError(friendlyError(e, 'Failed to connect wallet.'))
       }
       throw e
     }

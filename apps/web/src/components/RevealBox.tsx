@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { generateKeypair, encryptForCreator, verifyReveal, type Reveal } from '@/lib/reveal'
+import { friendlyError } from '@/lib/errors'
 
 const MONO = "var(--font-mono,'JetBrains Mono',monospace)"
 const SANS = "var(--font-sans,'Inter',sans-serif)"
@@ -54,7 +55,7 @@ export function RevealEncrypt({ creatorPubkey }: { creatorPubkey?: string }) {
   const run = () => {
     setErr(null); setOut(null)
     try { setOut(encryptForCreator(msg, pub)) }
-    catch (e) { setErr(e instanceof Error ? e.message : 'encrypt failed') }
+    catch (e) { setErr(friendlyError(e, 'Encryption failed.')) }
   }
   const loadReveal = (file: File) => {
     const r = new FileReader()
@@ -106,11 +107,11 @@ export function RevealDecrypt({
   const run = async () => {
     setErr(null); setOk(null); setReveal(null)
     try {
-      if (!expectedFingerprint) throw new Error('bounty ini belum diklaim (tidak ada sidik jari)')
+      if (!expectedFingerprint) throw new Error('This bounty has not been claimed yet, so there is no fingerprint to check.')
       const res = await verifyReveal(ct, sec, expectedFingerprint)
       setReveal(res.reveal)
       setOk(res.ok)
-    } catch (e) { setErr(e instanceof Error ? e.message : 'decrypt failed') }
+    } catch (e) { setErr(friendlyError(e, 'Decryption failed.')) }
   }
   const confirm = async () => {
     if (!onConfirm) return

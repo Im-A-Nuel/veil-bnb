@@ -11,12 +11,14 @@ import Verify from './screens/Verify'
 import Create from './screens/Create'
 import Detail from './screens/Detail'
 import AppNav from './AppNav'
-import Toast from './Toast'
+import Toast, { type ToastKind } from './Toast'
 import IntroOverlay from './IntroOverlay'
 import WalletModal from './WalletModal'
 import { useWallet } from '@/hooks/useWallet'
 import { shortAddr } from '@/lib/wallet'
 import { CONTRACTS_CONFIGURED, claim, listBounties, createBounty, confirmReveal, forfeitStake, proveReveal, type Groth16Proof } from '@/lib/chain'
+import { friendlyError } from '@/lib/errors'
+import { validateCreateForm, parseProofFile, checkProofBinding } from '@/lib/validate'
 import type { Reveal } from '@/lib/reveal'
 
 export default function VeilApp() {
@@ -34,6 +36,8 @@ export default function VeilApp() {
   const [chainError, setChainError] = useState<string | null>(null)
   const [claimTx, setClaimTx] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; kind: ToastKind } | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Direct-fetch daftar bounty dari registry (kalau kontrak dikonfigurasi).
   const loadBounties = useCallback(async () => {
@@ -44,7 +48,7 @@ export default function VeilApp() {
       setChainBounties(await listBounties())
     } catch (error) {
       setChainBounties([])
-      setChainError(error instanceof Error ? error.message : 'Check the RPC URL and registry address, then retry.')
+      setChainError(friendlyError(error, 'Could not read the registry. Check your connection and retry.'))
     } finally {
       setChainLoading(false)
     }
@@ -54,7 +58,10 @@ export default function VeilApp() {
   const addTimer = (t: ReturnType<typeof setTimeout>) => { timers.current.push(t) }
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
 
-  useEffect(() => () => clearTimers(), [])
+  useEffect(() => () => {
+    clearTimers()
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+  }, [])
 
   // Esc → step back one level
   useEffect(() => {
@@ -83,21 +90,42 @@ export default function VeilApp() {
     try { window.scrollTo(0, 0) } catch (_) {}
   }
 
-  const showToast = (msg: string, ms = 3200) => {
-    setS(prev => ({ ...prev, toast: msg }))
-    addTimer(setTimeout(() => setS(prev => ({ ...prev, toast: null })), ms))
+  const dismissToast = useCallback(() => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = null
+    setToast(null)
+  }, [])
+
+  const showToast = (msg: string, kind: ToastKind = 'info', ms?: number) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ msg, kind })
+    toastTimer.current = setTimeout(() => setToast(null), ms ?? (kind === 'error' ? 6000 : 3500))
   }
+  const showError = (e: unknown, fallback: string) => showToast(friendlyError(e, fallback), 'error')
 
   const connectWallet = () => setPickerOpen(true)
+
+  // Uses the connected account, or asks the wallet for one. Returns null if the user cancels.
+  const requireAccount = async (): Promise<`0x${string}` | null> => {
+    if (wallet.address) return wallet.address
+    try {
+      const w = await wallet.connect()
+      showToast('Wallet connected · ' + shortAddr(w.address), 'success')
+      return w.address
+    } catch (e) {
+      showError(e, 'Wallet connection cancelled.')
+      return null
+    }
+  }
 
   const chooseWallet = async (id: string) => {
     setConnectingId(id)
     try {
       const w = await wallet.connectWith(id)
       setPickerOpen(false)
-      showToast('Wallet connected · ' + shortAddr(w.address))
+      showToast('Wallet connected · ' + shortAddr(w.address), 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not connect', 4200)
+      showError(e, 'Could not connect the wallet.')
     } finally {
       setConnectingId(null)
     }
@@ -122,47 +150,43 @@ export default function VeilApp() {
 
   // capture proof.json { pi_a, pi_b, pi_c, publicSignals } (Groth16) → untuk claim on-chain
   const captureFile = async (file?: File) => {
-    if (!file) { proofRef.current = null; loadFile('proof.json'); return }
+    setS(prev => ({ ...prev, dragging: false }))
+    if (!file) return
     try {
-      const txt = await file.text()
-      const j = JSON.parse(txt)
-      if (!j.pi_a || !j.pi_b || !j.pi_c || !j.publicSignals) throw new Error('invalid')
-      proofRef.current = {
-        pi_a: j.pi_a.slice(0, 2) as [string, string],
-        pi_b: [j.pi_b[0].slice(0, 2), j.pi_b[1].slice(0, 2)] as [[string, string], [string, string]],
-        pi_c: j.pi_c.slice(0, 2) as [string, string],
-        publicSignals: j.publicSignals.slice(0, 5) as [string, string, string, string, string],
-      }
-    } catch {
+      proofRef.current = await parseProofFile(file)
+      loadFile(file.name)
+    } catch (e) {
       proofRef.current = null
+      setS(prev => ({ ...prev, fileLoaded: false, fileName: '' }))
+      showError(e, 'Could not read proof.json.')
     }
-    loadFile(file.name)
   }
 
   const startVerify = async () => {
     if (!s.fileLoaded) return
-    if (!proofRef.current) { showToast('Upload a valid proof.json first', 4000); return }
-    // If needed, request the first available injected EVM wallet.
-    let addr = wallet.address
-    if (!addr) {
-      try { addr = (await wallet.connect()).address; showToast('Wallet connected · ' + shortAddr(addr)) }
-      catch (e) { showToast(e instanceof Error ? e.message : 'Connect cancelled'); return }
-    }
+    const proof = proofRef.current
+    if (!proof) { showToast('Upload a valid proof.json first.', 'error'); return }
+    const target = allBounties.find(b => b.id === s.activeId)
+    const bindingError = checkProofBinding(proof, s.activeId, target?.victimFull)
+    if (bindingError) { showToast(bindingError, 'error'); return }
+
+    const addr = await requireAccount()
+    if (!addr) return
     clearTimers()
     const activeId = s.activeId
 
     setS(prev => ({ ...prev, screen: 'verify', verifyStep: 1, verified: false }))
     try { window.scrollTo(0, 0) } catch (_) {}
     try {
-      const hash = await claim(Number(activeId), addr, proofRef.current!)
+      const hash = await claim(Number(activeId), addr, proof)
       setClaimTx(hash)
       setS(st => ({ ...st, verifyStep: STEPS.length, verified: true, claimed: { ...st.claimed, [activeId]: true } }))
       wallet.refreshBalance()
       loadBounties()
-      showToast('Proof valid · reward released on-chain', 4200)
+      showToast('Proof valid · reward released on-chain', 'success')
     } catch (e) {
       setS(st => ({ ...st, verifyStep: 0, screen: 'submit' }))
-      showToast(e instanceof Error ? e.message : 'Claim failed on-chain', 5000)
+      showError(e, 'Claim failed on-chain.')
     }
   }
 
@@ -173,92 +197,66 @@ export default function VeilApp() {
   }
 
   const submitCreate = async () => {
+    if (busy) return
     const f = s.form
-    if (!f.addr || !f.vkHash || !f.reward || !f.description) {
-      showToast('Fill all fields (contract, vkHash, description, reward)'); return
-    }
-    if (!f.creatorPubkey) {
-      showToast('Generate a reveal key first (so hunters can send you the exploit)', 4500); return
-    }
-    // If needed, request the first available injected EVM wallet.
-    let addr = wallet.address
-    if (!addr) {
-      try { addr = (await wallet.connect()).address; showToast('Wallet connected · ' + shortAddr(addr)) }
-      catch (e) { showToast(e instanceof Error ? e.message : 'Connect cancelled'); return }
-    }
+    const invalid = validateCreateForm(f)
+    if (invalid) { showToast(invalid, 'error'); return }
+
+    const addr = await requireAccount()
+    if (!addr) return
     setBusy(true)
     try {
-      showToast(f.token === 'USDT' ? 'Approve USDT, then confirm the bounty transaction' : 'Confirm the bounty transaction in your wallet', 8000)
-      const revealWindow = Number(f.revealWindow) || 0
-      const escapeWindow = Number(f.escapeWindow) || 0
+      showToast(f.token === 'USDT' ? 'Approve USDT, then confirm the bounty transaction.' : 'Confirm the bounty transaction in your wallet.', 'info', 15000)
+      const hasStake = Number(f.stake || '0') > 0
       const { bountyId } = await createBounty({
         account: addr,
-        victim: f.addr,
-        vkHash: f.vkHash,
+        victim: f.addr.trim(),
+        vkHash: f.vkHash.trim(),
         creatorPubkey: f.creatorPubkey,
-        title: f.title || 'ZK Bounty',
-        description: f.description,
-        reward: f.reward,
-        stake: f.stake,
+        title: f.title.trim(),
+        description: f.description.trim(),
+        reward: f.reward.trim(),
+        stake: (f.stake || '0').trim(),
         token: f.token,
-        revealWindow,
-        escapeWindow,
+        revealWindow: hasStake ? Number(f.revealWindow) : 0,
+        escapeWindow: hasStake ? Number(f.escapeWindow) : 0,
       })
       await loadBounties()
       wallet.refreshBalance()
-      showToast(`Bounty #${bountyId} opened · ${f.reward} ${f.token} locked`, 4200)
+      showToast(`Bounty #${bountyId} opened · ${f.reward.trim()} ${f.token} locked`, 'success')
       go('hunt')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Open bounty failed', 5000)
+      showError(e, 'Opening the bounty failed.')
     } finally {
       setBusy(false)
     }
   }
 
-  // Creator konfirmasi reveal valid → stake balik ke hunter.
-  const onConfirmReveal = async (bountyId: string) => {
-    let addr = wallet.address
-    if (!addr) {
-      try { addr = (await wallet.connect()).address } catch { showToast('Connect wallet first'); return }
-    }
+  // Shared runner for single-transaction bounty actions.
+  const runBountyAction = async (action: (addr: `0x${string}`) => Promise<unknown>, success: string, fallback: string) => {
+    const addr = await requireAccount()
+    if (!addr) return
     try {
-      await confirmReveal(Number(bountyId), addr)
+      await action(addr)
       await loadBounties()
-      showToast('Reveal confirmed — stake released to hunter', 4200)
+      wallet.refreshBalance()
+      showToast(success, 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Confirm failed', 5000)
+      showError(e, fallback)
     }
   }
+
+  // Creator konfirmasi reveal valid → stake balik ke hunter.
+  const onConfirmReveal = (bountyId: string) =>
+    runBountyAction(addr => confirmReveal(Number(bountyId), addr), 'Reveal confirmed · stake released to hunter', 'Confirming the reveal failed.')
 
   // Deadline reveal lewat → stake hangus ke creator.
-  const onForfeit = async (bountyId: string) => {
-    let addr = wallet.address
-    if (!addr) {
-      try { addr = (await wallet.connect()).address } catch { showToast('Connect wallet first'); return }
-    }
-    try {
-      await forfeitStake(Number(bountyId), addr)
-      await loadBounties()
-      showToast('Deadline passed — stake forfeited to creator', 4200)
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Forfeit failed', 5000)
-    }
-  }
+  const onForfeit = (bountyId: string) =>
+    runBountyAction(addr => forfeitStake(Number(bountyId), addr), 'Deadline passed · stake forfeited to creator', 'Forfeiting the stake failed.')
 
   // Escape hatch: hunter reveal on-chain (publik) → stake balik (kalau creator ngeyel).
-  const onReclaimStake = async (bountyId: string, reveal: Reveal) => {
-    let addr = wallet.address
-    if (!addr) {
-      try { addr = (await wallet.connect()).address } catch { showToast('Connect wallet first'); return }
-    }
-    try {
-      await proveReveal(Number(bountyId), addr, reveal)
-      await loadBounties()
-      showToast('Revealed on-chain — stake reclaimed', 4200)
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Reclaim failed', 5000)
-    }
-  }
+  const onReclaimStake = (bountyId: string, reveal: Reveal) =>
+    runBountyAction(addr => proveReveal(Number(bountyId), addr, reveal), 'Revealed on-chain · stake reclaimed', 'Reclaiming the stake failed.')
 
   // Demo data is used only until a registry address is configured.
   const baseBounties = CONTRACTS_CONFIGURED ? (chainBounties ?? []) : BOUNTIES
@@ -294,6 +292,8 @@ export default function VeilApp() {
     }
   })
 
+  const balanceStr = (connected ? wallet.balance : s.balance).toLocaleString('en-US', { maximumFractionDigits: 4 })
+
   const isApp      = ['hunt', 'submit', 'verify', 'create', 'detail'].includes(s.screen)
   const huntActive = ['hunt', 'submit', 'verify'].includes(s.screen)
 
@@ -314,12 +314,9 @@ export default function VeilApp() {
             address={wallet.address}
             connecting={wallet.status === 'connecting'}
             onConnect={connectWallet}
-            onDisconnect={() => { wallet.disconnect(); showToast('Wallet disconnected') }}
-            onSwitch={async () => {
-              try { const w = await wallet.connect(); showToast('Account · ' + shortAddr(w.address)) }
-              catch (e) { showToast(e instanceof Error ? e.message : 'Switch account cancelled') }
-            }}
-            balanceStr={(connected ? wallet.balance : s.balance).toLocaleString('en-US')}
+            onDisconnect={() => { wallet.disconnect(); showToast('Wallet disconnected', 'info') }}
+            onSwitch={() => setPickerOpen(true)}
+            balanceStr={balanceStr}
           />
 
           {s.screen === 'hunt' && (
@@ -349,7 +346,11 @@ export default function VeilApp() {
               onDragOver={(e) => { e.preventDefault(); if (!s.dragging) setS(prev => ({ ...prev, dragging: true })) }}
               onDragLeave={(e) => { e.preventDefault(); setS(prev => ({ ...prev, dragging: false })) }}
               onDrop={(e) => { e.preventDefault(); captureFile(e.dataTransfer?.files?.[0]) }}
-              onPick={(e) => captureFile((e.target as HTMLInputElement).files?.[0] ?? undefined)}
+              onPick={(e) => {
+                const input = e.target as HTMLInputElement
+                captureFile(input.files?.[0] ?? undefined)
+                input.value = ''
+              }}
               startVerify={startVerify}
             />
           )}
@@ -359,7 +360,7 @@ export default function VeilApp() {
               bounty={activeBounty}
               steps={steps}
               verified={s.verified}
-              balanceStr={(connected ? wallet.balance : s.balance).toLocaleString('en-US')}
+              balanceStr={balanceStr}
               backToBounties={backToBounties}
               hunterAddr={wallet.address}
               txHash={claimTx}
@@ -399,7 +400,7 @@ export default function VeilApp() {
       )}
       </div>
 
-      {s.toast && <Toast message={s.toast} />}
+      {toast && <Toast message={toast.msg} kind={toast.kind} onClose={dismissToast} />}
 
       {showTop && !intro && (
         <button

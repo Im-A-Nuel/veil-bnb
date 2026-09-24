@@ -98,8 +98,12 @@ export default function Hunt({ bounties, openCount, filter, search, onFilter, on
           </p>
         </div>
       ) : (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-        style={{ gap: 1, background: '#242424', border: '1px solid #242424' }}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: 1, background: '#242424', border: '1px solid #242424',
+        }}
       >
         {bounties.map(b => (
           <div key={b.id} className="vcard p-4 md:p-6 flex flex-col" style={{ background: '#111111', minHeight: 200 }}>

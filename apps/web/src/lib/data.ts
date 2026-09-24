@@ -38,7 +38,6 @@ export interface AppState {
   balance: number
   claimed: Record<string, boolean>
   form: { addr: string; vkHash: string; title: string; description: string; reward: string; token: Token; stake: string; revealWindow: string; escapeWindow: string; creatorPubkey: string }
-  toast: string | null
 }
 
 export const BOUNTIES: Bounty[] = [
@@ -47,7 +46,7 @@ export const BOUNTIES: Bounty[] = [
 ]
 
 export const STEPS = [
-  'Submitting receipt to contract',
+  'Submitting proof to contract',
   'Verifying Groth16 proof on-chain',
   'Checking victim binding',
   'Releasing reward',
@@ -77,5 +76,4 @@ export const INITIAL_STATE: AppState = {
     escapeWindow: '1800',  // detik; escape hatch kebuka 30 menit sebelum deadline
     creatorPubkey: '',
   },
-  toast: null,
 }
