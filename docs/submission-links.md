@@ -4,7 +4,7 @@
 
 | Contract | Address | BscScan |
 |---|---|---|
-| MockGroth16Verifier | 0x... | https://testnet.bscscan.com/address/0x... |
+| Groth16Verifier | 0x... | https://testnet.bscscan.com/address/0x... |
 | VeilBountyRegistry | 0x... | https://testnet.bscscan.com/address/0x... |
 | VictimVault | 0x... | https://testnet.bscscan.com/address/0x... |
 

@@ -67,6 +67,11 @@ contract VeilBountyRegistryTest {
         registry.createBounty{ value: REWARD - 1 }(params);
     }
 
+    function testRejectsVerifierAddressWithoutCode() public {
+        vm.expectRevert(VeilBountyRegistry.VerifierHasNoCode.selector);
+        new VeilBountyRegistry(MockGroth16Verifier(address(0xBEEF)));
+    }
+
     function testClaimPaysRewardAndLocksStake() public {
         uint256 id = _createNative(REWARD, STAKE, 0);
         proofVerifier.setAcceptAll(true);

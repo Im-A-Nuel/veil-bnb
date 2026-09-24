@@ -52,6 +52,7 @@ contract VeilBountyRegistry {
     }
 
     error InvalidVerifier();
+    error VerifierHasNoCode();
     error InvalidVictim();
     error InvalidImageId();
     error InvalidReward();
@@ -106,6 +107,7 @@ contract VeilBountyRegistry {
 
     constructor(IGroth16Verifier verifier_) {
         if (address(verifier_) == address(0)) revert InvalidVerifier();
+        if (address(verifier_).code.length == 0) revert VerifierHasNoCode();
         verifier = verifier_;
     }
 

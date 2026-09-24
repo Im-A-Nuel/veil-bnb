@@ -3,7 +3,7 @@
 ## Protected properties
 
 - A reward can be paid only once.
-- A receipt must verify against the bounty's ImageID.
+- A Groth16 proof must verify through the configured verifier.
 - The public journal must bind the proof to the intended victim and bounty ID.
 - Native and token accounting must match the amount requested by the caller.
 - A hunter stake cannot be returned and forfeited twice.
@@ -15,14 +15,14 @@
 - Exact native value checks.
 - Balance-delta checks reject fee-on-transfer tokens.
 - Explicit lifecycle and deadline checks.
-- Strict 96-byte journal decoding.
+- Proof signals bound to the victim address and bounty ID.
 - Creator/hunter authorization on reveal settlement.
 - Escape hatch based on the proof-bound SHA-256 fingerprint.
 
 ## Trust assumptions
 
-- The configured RISC Zero verifier is authentic and supports the receipt version produced by `zk/host`.
-- The creator reviewed the guest code before publishing its ImageID.
+- The configured Groth16 verifier was generated from the same final zkey used by the prover.
+- The final zkey's setup transcript and verification key are reviewed before deployment.
 - The victim address and bounty description identify the intended target.
 - The selected BEP-20 behaves as expected and uses 18 decimals in the current UI.
 - Browser wallet extensions are trusted to display and sign the requested chain transaction correctly.
