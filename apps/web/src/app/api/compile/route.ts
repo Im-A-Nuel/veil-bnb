@@ -1,5 +1,5 @@
 export const runtime = 'nodejs'
-export const maxDuration = 600
+export const maxDuration = 300
 
 export async function POST(request: Request) {
   const agentUrl = (process.env.AGENT_URL || 'http://127.0.0.1:3001').replace(/\/$/, '')
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(590_000),
+      signal: AbortSignal.timeout(290_000),
     })
     const payload = await response.json()
     return Response.json(payload, { status: response.status })
