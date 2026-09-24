@@ -59,6 +59,10 @@ a:focus-visible,
   transition: transform .2s ease, border-color .2s ease,
               box-shadow .25s ease, background .2s ease;
 }
+/* 1px hairline drawn by each card, so empty grid cells stay transparent */
+.vcard.vcard-ring { box-shadow: 0 0 0 1px #242424; }
+.vcard.vcard-ring:hover { box-shadow: 0 0 0 1px #2e2e2e, 0 14px 36px -16px rgba(0, 0, 0, .7); }
+
 .vcard:hover {
   transform: translateY(-3px);
   border-color: #2e2e2e !important;
